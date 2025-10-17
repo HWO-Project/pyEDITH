@@ -10,11 +10,11 @@ authors:
   - name: Eleonora Alei
     orcid: 0000-0002-0006-1175
     equal-contrib: true
+    corresponding: true
     affiliation: "1"
   - name: Miles H. Currie
     orcid: 0000-0003-3429-4142
     equal-contrib: true
-    corresponding: true
     affiliation: "1"
   - name: Christopher C. Stark
     affiliation: "1"
