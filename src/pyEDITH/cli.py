@@ -85,7 +85,7 @@ def main():
             )
 
         parameters, _ = parse_input.read_configuration(args.edith)
-        texp = args.time
+        texp = args.time * u.hr
         snr, _ = calculate_snr(parameters, texp, args.verbose)
         print(snr)
 

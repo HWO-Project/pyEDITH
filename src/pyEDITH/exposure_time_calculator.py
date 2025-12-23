@@ -967,7 +967,7 @@ def calculate_exposure_time_or_snr(
 
                     # calculate the exozodi noisefloor to account for imperfect exozodi removal
                     CRnf_ez = calculate_CRnf_ez(
-                        CRbez
+                        CRbez[0]
                         * observatory.coronagraph.omega_lod[
                             int(np.floor(iy)), int(np.floor(ix)), iratio
                         ].value,
@@ -1118,7 +1118,7 @@ def calculate_exposure_time_or_snr(
                         t_photon_count,
                     )
 
-                    observation.photon_counts["CRbd"][ilambd] = CRbd.value
+                    observation.photon_counts["CRbd"][ilambd] = float(CRbd.value)
 
                     CRbth = calculate_CRbth(
                         observation.wavelength[ilambd],
@@ -1143,7 +1143,7 @@ def calculate_exposure_time_or_snr(
                     ) * observatory.coronagraph.omega_lod[
                         int(np.floor(iy)), int(np.floor(ix)), iratio
                     ]
-                    observation.photon_counts["CRb"][ilambd] = CRb.value
+                    observation.photon_counts["CRb"][ilambd] = float(CRb.value)
 
                     # Add detector noise
                     CRb += CRbd
