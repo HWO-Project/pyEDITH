@@ -23,8 +23,8 @@ extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
-    "myst_parser",
     "nbsphinx",
+    "myst_parser",
 ]
 
 
@@ -35,7 +35,8 @@ source_suffix = {
 }
 
 # NBSphinx settings
-nbsphinx_execute = "auto"
+nbsphinx_execute = "never"  # Use existing outputs from committed notebooks
+nbsphinx_allow_errors = False  # Fail if notebooks have errors in outputs
 
 # MyST settings
 myst_enable_extensions = [
@@ -85,3 +86,19 @@ def add_filter_to_env(app):
 def setup(app):
     app.connect("builder-inited", add_filter_to_env)
     app.add_css_file("custom.css")
+
+    # Copy tutorial notebooks directly to docs/source during build
+    import shutil
+    from pathlib import Path
+
+    source_dir = Path(__file__).parent
+    tutorials_src = source_dir / "../../tutorials"
+
+    # Copy specific notebooks directly to source folder
+    notebooks_to_copy = ["imaging_tutorial.ipynb", "spectroscopy_tutorial.ipynb"]
+
+    for notebook in notebooks_to_copy:
+        src = tutorials_src / notebook
+        dst = source_dir / notebook
+        if src.exists():
+            shutil.copy2(src, dst)

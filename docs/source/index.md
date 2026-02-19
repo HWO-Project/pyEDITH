@@ -43,8 +43,8 @@ Alei, E. and Currie, M. H. et al. (2025),.....
 
 installation
 run_pyedith
-../../tutorials/imaging_tutorial.ipynb
-../../tutorials/spectroscopy_tutorial.ipynb
+imaging_tutorial
+spectroscopy_tutorial
 advanced
 glossary
 validation
