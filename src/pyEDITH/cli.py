@@ -48,11 +48,11 @@ def main():
     parser_b = subparsers.add_parser(
         "snr",
         help="SNR calculator for a specific lambda (in .edith file) and for a given \
-            exposure time (argument, in hours)",
+            exposure time (argument, in seconds)",
     )
     parser_b.add_argument("--edith", type=str, help="an .edith file")
     parser_b.add_argument(
-        "--time", type=float, help="the desired observing time in minutes"
+        "--time", type=float, help="the desired observing time in seconds"
     )
 
     parser_c = subparsers.add_parser(
@@ -85,7 +85,7 @@ def main():
             )
 
         parameters, _ = parse_input.read_configuration(args.edith)
-        texp = args.time * u.hr
+        texp = args.time * u.s
         snr, _ = calculate_snr(parameters, texp, args.verbose)
         print(snr)
 
@@ -206,7 +206,7 @@ def calculate_snr(parameters: dict, reference_texp: float, verbose: bool):
     parameters : dict
         Dictionary containing all input parameters for the calculation
     reference_texp : float
-        Reference exposure time in hours
+        Reference exposure time in seconds
     verbose : bool
         If True, print detailed calculation information
 

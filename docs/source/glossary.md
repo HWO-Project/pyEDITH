@@ -103,7 +103,7 @@
 ### A note on calculating `omega_lod`:
 The photometric aperture `omega_lod` can be calculated via two methods, and the user should specify 
 either the `psf_trunc_ratio` or `photometric_aperture_radius` parameters to do so.
-- photometric_aperture_radius` simply sets a radius for the photometric aperture, such that `omega_lod = \pi * (photometric_aperture_radius * (lambda/D))^2`, 
+- `photometric_aperture_radius` simply sets a radius for the photometric aperture, such that `omega_lod = \pi * (photometric_aperture_radius * (lambda/D))^2`, 
 where `omega_lod` is the solid angle of the photometric aperture. 
 - In contrast, `psf_trunc_ratio` is a more complex way of calculating the photometric aperture solid angle `omega_lod`, necessary because the off-axis PSF is not always going to be a perfect circle, and can be misshapen. In principle, this method takes an off-axis PSF and calculates `omega_lod` as all pixels in the PSF that are above the threshold `psf_trunc_ratio * max(off-axis PSF)`, accounting for imperfect PSF shapes. Note: If the off-axis PSF shape is a perfect airy disk, then `psf_trunc_ratio` is simply `1 - photometric_aperture_radius`. 
 - Finally, `photometric_aperture_throughput` is an entirely different, but related, parameter, not to be confused with the two parameters above. This parameter is essentially the core throughput of the off-axis PSF. In other words, this is the fraction of light entering the coronagraph that ends up within the photometric core of the off-axis (planet) PSF assuming perfectly reflecting/transmitting optics, where the core is the solid angle area `omega_lod` and is set by either `psf_trunc_ratio` or `photometric_aperture_radius`. 
