@@ -967,7 +967,7 @@ def calculate_exposure_time_or_snr(
 
                     # calculate the exozodi noisefloor to account for imperfect exozodi removal
                     CRnf_ez = calculate_CRnf_ez(
-                        CRbez[0]
+                        CRbez
                         * observatory.coronagraph.omega_lod[
                             int(np.floor(iy)), int(np.floor(ix)), iratio
                         ].value,
@@ -1332,9 +1332,32 @@ def calculate_exposure_time_or_snr(
                         observation.fullsnr[ilambd] = np.inf
 
         else:
-            print(
-                "WARNING: Planet outside OWA or inside IWA. Hardcoded infinity results."
-            )
+            if not (
+                (
+                    sp_lod > observatory.coronagraph.minimum_IWA
+                )  # check that the separation in l/D is more than the minimum allowed IWA
+                and (
+                    sp_lod < observatory.coronagraph.maximum_OWA
+                )  # check that the separation in l/D is less than the maximum allowed OWA
+            ):
+                print(
+                    "WARNING: Planet outside OWA or inside IWA. Hardcoded infinity results."
+                )
+
+            if not (
+                (ix >= 0)  # check that x pixel is positive
+                and (
+                    ix < observatory.coronagraph.npix
+                )  # check that it is less than the maximum pixel number
+                and (iy >= 0)  # check that the y pixel is positive
+                and (
+                    iy < observatory.coronagraph.npix
+                )  # check that it is less than the maximum pixel number
+            ):
+
+                print(
+                    "WARNING: Planet outside coronagraph YIP image. Hardcoded infinity results."
+                )
             if mode == "exposure_time":
                 observation.exptime[ilambd] = np.inf
             elif mode == "signal_to_noise":
