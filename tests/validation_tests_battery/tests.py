@@ -13,7 +13,7 @@ hpic = pd.read_csv(os.path.join(script_dir, "full_HPIC.txt"), sep="|")
 
 
 def to_arcsec(quantity, observer_distance):
-    return np.arctan(quantity / observer_distance).to(u.arcsec).value
+    return np.arctan(quantity / observer_distance).to_value(ARCSEC)
 
 
 def fluxes_to_magnitudes(F_star, F_p):

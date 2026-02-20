@@ -17,7 +17,7 @@ class Observation:
 
     Parameters
     -----------
-    lambd : np.ndarray
+    wavelength : np.ndarray
         Wavelength array (in microns).
     nlambd : int
         Number of wavelength points.

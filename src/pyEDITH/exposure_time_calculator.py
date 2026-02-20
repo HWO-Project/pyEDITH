@@ -58,8 +58,8 @@ def calculate_CRp(
     return (
         F0 * Fs_over_F0 * Fp_over_Fs * area * Upsilon * throughput * dlambda * nchannels
     ).to(
-        u.electron / (u.s),
-        equivalencies=u.equivalencies.dimensionless_angles(),
+        COUNT_RATE,
+        equivalencies=EQUIV_ANGLE,
     )
 
 
@@ -114,8 +114,8 @@ def calculate_CRbs(
         * nchannels
         / (pixscale**2)
     ).to(
-        u.electron / (u.s),
-        equivalencies=u.equivalencies.dimensionless_angles(),
+        COUNT_RATE,
+        equivalencies=EQUIV_ANGLE,
     )
 
 
@@ -163,8 +163,8 @@ def calculate_CRbz(
     return (
         F0 * Fzodi * skytrans * area * throughput * dlambda * nchannels * lod_arcsec**2
     ).to(
-        u.electron / (u.s),
-        equivalencies=u.equivalencies.dimensionless_angles(),
+        COUNT_RATE,
+        equivalencies=EQUIV_ANGLE,
     )
 
 
@@ -229,8 +229,8 @@ def calculate_CRbez(
         * nchannels
         * lod_arcsec**2
     ).to(
-        u.electron / (u.s),
-        equivalencies=u.equivalencies.dimensionless_angles(),
+        COUNT_RATE,
+        equivalencies=EQUIV_ANGLE,
     )  # this is to simplify the arcsec^2/arcsec^2 that somehow does not simplify by itself
 
 
@@ -278,8 +278,8 @@ def calculate_CRbbin(
     """
 
     return (F0 * Fbinary * skytrans * area * throughput * dlambda * nchannels).to(
-        u.electron / (u.s),
-        equivalencies=u.equivalencies.dimensionless_angles(),
+        COUNT_RATE,
+        equivalencies=EQUIV_ANGLE,
     )
 
 
@@ -327,19 +327,17 @@ def calculate_CRbth(
     """
 
     # Calculate blackbody radiation
-    bb = models.BlackBody(
-        temperature=temp, scale=1 * u.erg / (u.cm**2 * u.AA * u.s * u.sr)
-    )
+    bb = models.BlackBody(temperature=temp, scale=1 * SPECTRAL_RADIANCE_CGS_AA)
     Blambda_energy = bb(lam)
 
     # Convert to photon spectral radiance
     Blambda_photon = (Blambda_energy).to(
-        u.photon / (u.cm**2 * u.nm * u.s * u.sr), equivalencies=u.spectral_density(lam)
+        PHOTON_SPECTRAL_RADIANCE_SR, equivalencies=u.spectral_density(lam)
     )
 
     # Calculate thermal background count rate
     return (Blambda_photon * dlambda * area * (lod_rad * lod_rad) * emis * QE * dQE).to(
-        u.electron / u.s
+        COUNT_RATE
     )
 
 
@@ -414,8 +412,8 @@ def calculate_CRbd(
     return (
         (det_DC + read_noise_variance / det_tread + det_CIC / t_photon_count) * det_npix
     ).to(
-        u.electron / (u.s),
-        equivalencies=u.equivalencies.dimensionless_angles(),
+        COUNT_RATE,
+        equivalencies=EQUIV_ANGLE,
     )
 
 
@@ -678,18 +676,18 @@ def calculate_exposure_time_or_snr(
             deltalambda_nm = (
                 np.min(
                     [
-                        (observation.wavelength[ilambd].to(u.nm).value)
+                        (observation.wavelength[ilambd].to_value(NM))
                         / observatory.coronagraph.coronagraph_spectral_resolution,
                         observatory.coronagraph.bandwidth
-                        * (observation.wavelength[ilambd].to(u.nm).value),
+                        * (observation.wavelength[ilambd].to_value(NM)),
                     ]
                 )
-                * u.nm
+                * NM
             )  # nanometers
             if (
                 observatory.coronagraph.bandwidth
-                * observation.wavelength[ilambd].to(u.nm).value
-                >= observation.wavelength[ilambd].to(u.nm).value
+                * observation.wavelength[ilambd].to_value(NM)
+                >= observation.wavelength[ilambd].to_value(NM)
                 / observatory.coronagraph.coronagraph_spectral_resolution
             ):
                 logger.warning(
@@ -697,7 +695,7 @@ def calculate_exposure_time_or_snr(
                 )
         elif observatory.observing_mode == "IFS":
             # the effective bandwidth is the width of the spectral element
-            deltalambda_nm = observation.delta_wavelength[ilambd].to(u.nm)
+            deltalambda_nm = observation.delta_wavelength[ilambd].to(NM)
         else:
             raise ValueError("Invalid observation mode. Choose 'IMAGER' or 'IFS'.")
 
@@ -714,12 +712,12 @@ def calculate_exposure_time_or_snr(
         )
 
         # Convert to arcseconds
-        lod_arcsec = lod_rad.to(u.arcsec)
+        lod_arcsec = lod_rad.to(ARCSEC)
 
-        area_cm2 = observatory.telescope.Area.to(u.cm**2)
+        area_cm2 = observatory.telescope.Area.to(AREA)
 
         detpixscale_lod = arcsec_to_lambda_d(
-            observatory.detector.pixscale_mas.to(u.arcsec),
+            observatory.detector.pixscale_mas.to(ARCSEC),
             observation.wavelength[ilambd].to(LENGTH),
             observatory.telescope.diameter.to(LENGTH),
         )  # LAMBDA_D units
@@ -755,7 +753,7 @@ def calculate_exposure_time_or_snr(
             observatory.telescope.diameter.to(LENGTH),
         )  # going from LAMBDA_D to radians
 
-        oneopixscale_arcsec = 1 * PIXEL / pixscale_rad.to(u.arcsec)
+        oneopixscale_arcsec = 1 * PIXEL / pixscale_rad.to(ARCSEC)
 
         # Measure coronagraph performance at each IWA
         (
@@ -1240,7 +1238,7 @@ def calculate_exposure_time_or_snr(
                         "dist": scene.dist,
                         "D": observatory.telescope.diameter,
                         "A_cm": area_cm2,
-                        "wavelength": observation.wavelength[ilambd].to(u.nm),
+                        "wavelength": observation.wavelength[ilambd].to(NM),
                         "deltalambda_nm": deltalambda_nm,
                         "snr": observation.SNR[ilambd],
                         "nzodis": scene.nzodis,

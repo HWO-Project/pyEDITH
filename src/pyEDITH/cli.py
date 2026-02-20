@@ -2,7 +2,7 @@ from pyEDITH import AstrophysicalScene, Observation, ObservatoryBuilder
 from pyEDITH import calculate_exposure_time_or_snr, parse_input
 from argparse import ArgumentParser
 import numpy as np
-import astropy.units as u
+from .units import *
 import sys
 from . import set_verbosity
 import os
@@ -113,7 +113,7 @@ def main():
             )
 
         parameters, _ = parse_input.read_configuration(args.edith)
-        texp = args.time * u.s
+        texp = args.time * TIME
         snr, _ = calculate_snr(parameters, texp)
         print(snr)
 

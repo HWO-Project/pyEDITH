@@ -3,6 +3,7 @@ import numpy as np
 import astropy.units as u
 from typing import Dict, Any
 import logging
+from .units import *
 
 logger = logging.getLogger("pyEDITH")
 
@@ -247,7 +248,7 @@ def print_array_info(
 
         # Handle units
         if hasattr(arr, "unit"):
-            if arr.unit == u.dimensionless_unscaled:
+            if arr.unit == DIMENSIONLESS:
                 file.write(" Unit: dimensionless\n")
             else:
                 file.write(f" Unit: {arr.unit}\n")
