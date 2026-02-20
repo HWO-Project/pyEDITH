@@ -35,10 +35,32 @@ def main():
         If secondary parameters are not specified in etc2snr mode or
         if the returned exposure time is infinity
     """
+    parent_parser = ArgumentParser(add_help=False)
+    parent_parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="Increase verbosity: -v for INFO, -vv for DEBUG logs with detailed output",
+    )
+    parent_parser.add_argument(
+        "-q", "--quiet", action="store_true", help="Quiet mode, only show errors"
+    )
 
     parser = ArgumentParser(
-        description="Available command line arguments for E.D.I.T.H."
+        description="Available command line arguments for E.D.I.T.H.",
     )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="Increase verbosity: -v for INFO, -vv for DEBUG logs with detailed output",
+    )
+    parser.add_argument(
+        "-q", "--quiet", action="store_true", help="Quiet mode, only show errors"
+    )
+
     subparsers = parser.add_subparsers(
         dest="subfunction", help="Subfunction to execute"
     )
@@ -64,17 +86,6 @@ def main():
             calculated on a primary lambda (in .edith file)",
     )
     parser_c.add_argument("--edith", type=str, help="an .edith file")
-
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="count",
-        default=0,
-        help="Increase verbosity: -v for INFO, -vv for DEBUG logs with detailed output",
-    )
-    parser.add_argument(
-        "-q", "--quiet", action="store_true", help="Quiet mode, only show errors"
-    )
 
     args = parser.parse_args()
 

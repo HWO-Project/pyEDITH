@@ -370,8 +370,8 @@ def test_calculate_exposure_time_or_snr(caplog):
 
     # INFINITY CASES
     # Case 1: Planet outside OWA
-    observatory.coronagraph.maximum_OWA = 0.5 * LAMBDA_D
     with caplog.at_level(logging.WARNING, logger="pyEDITH"):
+        observatory.coronagraph.maximum_OWA = 0.5 * LAMBDA_D
         calculate_exposure_time_or_snr(observation, scene, observatory)
         assert np.isinf(observation.exptime[0])
         assert any(
@@ -493,6 +493,18 @@ def test_calculate_exposure_time_or_snr(caplog):
         calculate_exposure_time_or_snr(observation, scene, observatory)
         assert np.isinf(observation.exptime[0])
         observation.td_limit = original_td_limit  # Reset to original value
+
+        # Case 7: Planet outisde coronagraph YIP image
+        scene.xp = 10 * u.arcsec  # make the planet very far
+        calculate_exposure_time_or_snr(observation, scene, observatory)
+        assert any(
+            "Planet outside coronagraph YIP image. Hardcoded infinity results."
+            in record.message
+            for record in caplog.records
+            if record.levelno == logging.ERROR
+        )
+        assert np.isinf(observation.exptime[0])
+        scene.xp = 0.0628 * u.arcsec  # restore original
 
         # Invalid observing mode
         with pytest.raises(

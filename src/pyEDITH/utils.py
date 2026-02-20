@@ -264,7 +264,10 @@ def print_array_info(
             if np.issubdtype(arr.dtype, np.integer):
                 file.write(f" Value: {arr.item():d}\n")
             else:
-                file.write(f" Value: {arr.item():.6e}\n")
+                if arr.item() is None:
+                    file.write("Value: None\n")
+                else:
+                    file.write(f"Value: {arr.item():.6e}\n")
         else:
             file.write(f" Shape: {arr.shape}\n")
             if arr.size > 0:
@@ -293,8 +296,10 @@ def print_array_info(
             if has_units:
                 file.write(f"value: {arr.value.item():.6e}\n")
             else:
-
-                file.write(f"value: {arr.item():.6e}\n")
+                if arr.item() is None:
+                    file.write("value: None\n")
+                else:
+                    file.write(f"value: {arr.item():.6e}\n")
         else:
             max_val = np.max(arr)
             min_val = np.min(arr)
