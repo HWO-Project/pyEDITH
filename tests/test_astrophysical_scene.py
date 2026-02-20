@@ -22,10 +22,11 @@ from pyEDITH.astrophysical_scene import (
     calc_exozodi_flux,
     calc_zodi_flux,
 )
+import logging
 
 
 # Test calc_flux_zero_point function
-def test_calc_flux_zero_point(capsys):
+def test_calc_flux_zero_point(caplog):
     wavelength = 500 * u.nm
     f0 = calc_flux_zero_point(wavelength)
     assert isinstance(f0, u.Quantity)
@@ -70,10 +71,15 @@ def test_calc_flux_zero_point(capsys):
     with pytest.raises(ValueError):
         calc_flux_zero_point(wavelength, output_unit="jy", perlambd=True)
 
-    # test verbose
-    calc_flux_zero_point(wavelength, verbose=True)
-    captured = capsys.readouterr()
-    assert "Flux zero point calculated" in captured.out
+    # test logs
+    caplog.clear()  # Clear any previous logs
+    with caplog.at_level(logging.DEBUG, logger="pyEDITH"):
+        f0 = calc_flux_zero_point(wavelength)
+        assert any(
+            "Flux zero point calculated" in record.message
+            for record in caplog.records
+            if record.levelno == logging.INFO
+        )
 
     # test array shaped wavelengths
     wavelengths = np.array([0.3, 0.5, 1, 5]) * WAVELENGTH
@@ -194,7 +200,7 @@ def test_calc_zodi_flux():
     assert np.isclose(zodi_flux.value, 3.52136205e-10, rtol=1e-4)
 
 
-def test_astrophysical_scene_load_configuration(capsys):
+def test_astrophysical_scene_load_configuration(caplog):
     scene = AstrophysicalScene()
 
     # Test with magnitude inputs
@@ -359,12 +365,14 @@ def test_astrophysical_scene_load_configuration(capsys):
     }
 
     # Capture warnings
-    scene.load_configuration(parameters)
-    captured = capsys.readouterr()
-    assert (
-        "WARNING: `FstarV_10pc` not specified in parameters. Calculating internally..."
-        in captured.out
-    )
+    caplog.clear()  # Clear any previous logs
+    with caplog.at_level(logging.DEBUG, logger="pyEDITH"):
+        scene.load_configuration(parameters)
+        assert any(
+            "not specified in parameters. Calculating internally..." in record.message
+            for record in caplog.records
+            if record.levelno == logging.WARNING
+        )
 
     # Test case where ez_PPF is provided as a scalar (to be propagated at all wavelengths)
     parameters["ez_PPF"] = 100.0
@@ -658,7 +666,9 @@ def test_regrid_spectra():
 
     # Create a mock Observation object
     class MockObservation:
-        wavelength = np.linspace(0.5, 1.7, 100) * WAVELENGTH  # the binned-down wavelength grid calculated with the specified R and channel cutoffs
+        wavelength = (
+            np.linspace(0.5, 1.7, 100) * WAVELENGTH
+        )  # the binned-down wavelength grid calculated with the specified R and channel cutoffs
         nlambd = len(wavelength)
         delta_wavelength = np.gradient(wavelength)
 

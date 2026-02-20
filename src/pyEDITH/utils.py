@@ -2,6 +2,9 @@ from scipy.interpolate import interp1d
 import numpy as np
 import astropy.units as u
 from typing import Dict, Any
+import logging
+
+logger = logging.getLogger("pyEDITH")
 
 
 def average_over_bandpass(params: dict, wavelength_range: list) -> dict:
@@ -432,6 +435,9 @@ def print_all_variables(
     CRb : np.ndarray
         Total background count rate
     """
+    logger.debug(
+        "Printing all relevant variables in pyedith_validation.txt and pyedith_full_info.txt."
+    )
 
     for mode in ["validation", "full_info"]:
         with open("pyedith_" + mode + ".txt", "w") as file:

@@ -5,7 +5,9 @@ import astropy.constants as const
 from .units import *
 from . import utils
 from astropy.coordinates import SkyCoord
+import logging
 
+logger = logging.getLogger("pyEDITH")
 # def calc_flux_zero_point_synphot(lam: u.Quantity):
 
 #     # calculates a zeropoint Vega spectrum using boxcar filters
@@ -57,7 +59,6 @@ def calc_flux_zero_point(
     output_unit: str = "pcgs",
     perlambd: bool = False,
     AB: bool = False,
-    verbose: bool = False,
 ) -> u.Quantity:
     """
     Calculate the flux zero point for given wavelengths.
@@ -81,9 +82,6 @@ def calc_flux_zero_point(
         Default is False.
     AB : bool, optional
         If True, use AB magnitude system instead of Johnson.
-        Default is False.
-    verbose : bool, optional
-        If True, print additional information.
         Default is False.
 
     Returns
@@ -161,8 +159,7 @@ def calc_flux_zero_point(
                 PHOTON_COUNT / (u.s * u.cm**3), equivalencies=u.spectral_density(lambd)
             )
 
-    if verbose:
-        print(f"Flux zero point calculated at {lambd} in units of {f0.unit}")
+    logger.info(f"Flux zero point calculated at {lambd} in units of {f0.unit}")
 
     return f0
 
@@ -604,8 +601,8 @@ class AstrophysicalScene:
                 "FstarV_10pc" not in parameters
                 and parameters["observing_mode"] == "IFS"
             ):
-                print(
-                    "WARNING: `FstarV_10pc` not specified in parameters. Calculating internally..."
+                logger.warning(
+                    "`FstarV_10pc` not specified in parameters. Calculating internally..."
                 )
                 # from synphot import SourceSpectrum, SpectralElement, Observation
                 # from synphot.models import Empirical1D
@@ -725,8 +722,8 @@ class AstrophysicalScene:
                 ), "length of ez_PPF does not match length of Fp_over_Fs"
                 self.ez_PPF = np.array(parameters["ez_PPF"])
         else:
-            print(
-                "WARNING: ez_PPF not set. Assuming EZ subtraction to Poisson limit (ez_PPF = inf)"
+            logger.warning(
+                "ez_PPF not set. Assuming EZ subtraction to Poisson limit (ez_PPF = inf)"
             )
             self.ez_PPF = np.inf * np.ones_like(self.Fp_over_Fs)
 
@@ -805,7 +802,7 @@ class AstrophysicalScene:
     def regrid_spectra(self, parameters, observation):
         """function to re-grid onto a new wavelength grid if the user specified this option"""
         # spectra to regrid: F0, Fzodi_list, Fexozodi_list, Fbinary_list, Fp_over_Fs, Fs_over_F0
-        print("Re-gridding spectra onto ETC wavelength grid...")
+        logger.info("Re-gridding spectra onto ETC wavelength grid...")
         self.F0 = utils.regrid_spec_gaussconv(
             parameters["wavelength"],
             self.F0,

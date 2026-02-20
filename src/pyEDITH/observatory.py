@@ -2,6 +2,9 @@ from abc import ABC, abstractmethod
 import numpy as np
 from .units import *
 from . import utils
+import logging
+
+logger = logging.getLogger("pyEDITH")
 
 
 class Observatory(ABC):  # abstract class
@@ -66,10 +69,10 @@ class Observatory(ABC):  # abstract class
         """
 
         if "T_optical" in parameters.keys():
-            print("Calculating optics_throughput from input...")
+            logger.info("Calculating optics_throughput from input...")
             self.optics_throughput = parameters["T_optical"] * DIMENSIONLESS
         else:
-            print("Calculating optics throughput from preset...")
+            logger.info("Calculating optics throughput from preset...")
             self.optics_throughput = (
                 self.telescope.telescope_optical_throughput
                 * self.coronagraph.coronagraph_optical_throughput
@@ -111,10 +114,10 @@ class Observatory(ABC):  # abstract class
         """
 
         if "epswarmTrcold" in parameters.keys():
-            print("Calculating epswarmTrcold from input...")
+            logger.info("Calculating epswarmTrcold from input...")
             self.epswarmTrcold = parameters["epswarmTrcold"] * DIMENSIONLESS
         else:
-            print("Calculating epswarmTrcold as 1 - optics throughput...")
+            logger.info("Calculating epswarmTrcold as 1 - optics throughput...")
             self.epswarmTrcold = (
                 np.ones_like(mediator.get_observation_parameter("wavelength").value)
                 - self.optics_throughput

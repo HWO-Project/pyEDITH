@@ -290,7 +290,7 @@ def test_calculate_snr(mock_parameters):
         mock_builder.create_observatory.return_value = mock_observatory
 
         # Call the function under test
-        snr, validation_variables = calculate_snr(mock_parameters, 1.0, False)
+        snr, validation_variables = calculate_snr(mock_parameters, 1.0)
 
         # Assert the results
         assert np.array_equal(snr, np.array([10.0]))
@@ -328,7 +328,7 @@ def test_calculate_snr(mock_parameters):
         mock_builder.create_observatory.return_value = mock_observatory
 
         # Call the function under test
-        snr, validation_variables = calculate_snr(mock_parameters, 1.0, False)
+        snr, validation_variables = calculate_snr(mock_parameters, 1.0)
 
         # Assert the results
         assert np.array_equal(snr, np.array([10.0]))

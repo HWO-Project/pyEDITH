@@ -6,8 +6,11 @@ import astropy.constants as c
 import astropy.units as u
 from astropy.modeling import models
 from .units import *
-from . import utils
+from . import utils, set_verbosity
 import pickle
+import logging
+
+logger = logging.getLogger("pyEDITH")
 
 
 def calculate_CRp(
@@ -603,7 +606,6 @@ def calculate_exposure_time_or_snr(
     observation: Observation,
     scene: AstrophysicalScene,
     observatory: Observatory,
-    verbose: bool,
     ETC_validation: bool = False,
     mode: str = "exposure_time",
 ) -> None:
@@ -629,8 +631,6 @@ def calculate_exposure_time_or_snr(
         contrast, stellar properties, and zodiacal light levels
     observatory : Observatory
         Observatory object containing telescope, detector, and coronagraph parameters
-    verbose : bool
-        If True, print detailed calculation information to the console
     ETC_validation : bool, optional
         If True, use specific parameter values for validation against the ETC,
         default is False
@@ -646,7 +646,9 @@ def calculate_exposure_time_or_snr(
         'IMAGER' or 'IFS'
 
     """
-
+    if ETC_validation:
+        set_verbosity(level="debug")
+        logger.debug("Verbosity level locked to 'DEBUG' to execute validation.")
     # Check modes
     if mode not in ["exposure_time", "signal_to_noise"]:
         raise ValueError("Invalid mode. Use 'exposure_time' or 'signal_to_noise'.")
@@ -690,8 +692,8 @@ def calculate_exposure_time_or_snr(
                 >= observation.wavelength[ilambd].to(u.nm).value
                 / observatory.coronagraph.coronagraph_spectral_resolution
             ):
-                print(
-                    "WARNING: Bandwidth larger than what the coronagraph allows. Selecting widest possible bandwidth..."
+                logger.warning(
+                    "Bandwidth larger than what the coronagraph allows. Selecting widest possible bandwidth..."
                 )
         elif observatory.observing_mode == "IFS":
             # the effective bandwidth is the width of the spectral element
@@ -776,7 +778,7 @@ def calculate_exposure_time_or_snr(
         )
 
         if ETC_validation:
-            print("Fixing det_npix for validation...")
+            logger.debug("Fixing det_npix for validation...")
 
             det_npix = observatory.detector.det_npix_input * PIXEL
         else:
@@ -1026,8 +1028,8 @@ def calculate_exposure_time_or_snr(
 
                     # (for exposure time mode) Check if it's above the noise floor
                     if mode == "exposure_time" and CRp <= CRnf:
-                        print(
-                            "WARNING: Count rate of the planet smaller than the noise floor. Hardcoded infinity results."
+                        logger.error(
+                            "Count rate of the planet smaller than the noise floor. Hardcoded infinity results."
                         )
 
                         observation.exptime[ilambd] = np.inf
@@ -1104,7 +1106,7 @@ def calculate_exposure_time_or_snr(
                         det_CR,
                     )
                     if ETC_validation:
-                        print("Fixing t_photon_count for validation...")
+                        logger.debug("Fixing t_photon_count for validation...")
                         # the ETC validation (Stark+2025) fixed the frame rate
                         # t_photon_count = 1 / (det_CRp.value) * SECOND / FRAME
                         t_photon_count = observatory.detector.t_photon_count_input
@@ -1323,8 +1325,8 @@ def calculate_exposure_time_or_snr(
                     }
 
                 else:
-                    print(
-                        "WARNING: Photometric aperture is not large enough. Hardcoded infinity results."
+                    logger.error(
+                        "Photometric aperture is not large enough. Hardcoded infinity results."
                     )
                     if mode == "exposure_time":
                         observation.exptime[ilambd] = np.inf
@@ -1340,8 +1342,8 @@ def calculate_exposure_time_or_snr(
                     sp_lod < observatory.coronagraph.maximum_OWA
                 )  # check that the separation in l/D is less than the maximum allowed OWA
             ):
-                print(
-                    "WARNING: Planet outside OWA or inside IWA. Hardcoded infinity results."
+                logger.error(
+                    "Planet outside OWA or inside IWA. Hardcoded infinity results."
                 )
 
             if not (
@@ -1355,15 +1357,16 @@ def calculate_exposure_time_or_snr(
                 )  # check that it is less than the maximum pixel number
             ):
 
-                print(
-                    "WARNING: Planet outside coronagraph YIP image. Hardcoded infinity results."
+                logger.error(
+                    "Planet outside coronagraph YIP image. Hardcoded infinity results."
                 )
             if mode == "exposure_time":
                 observation.exptime[ilambd] = np.inf
             elif mode == "signal_to_noise":
                 observation.fullsnr[ilambd] = np.inf
 
-        if verbose:
+        # if logging is at a DEBUG level, print all variables
+        if logger.isEnabledFor(logging.DEBUG):
             utils.print_all_variables(
                 observation,
                 scene,

@@ -1,6 +1,112 @@
 # src/pyEDITH/__init__.py
+import sys
+import logging
 
-# Import main classes
+
+import logging
+import sys
+
+
+# ANSI color codes for your palette
+class ColorCodes:
+    WARNING = "\033[38;2;226;147;0m"  # #E29300 - Orange for warnings
+    ERROR = "\033[38;2;156;29;16m"  # #9C1D10 - Dark red for errors
+    RESET = "\033[0m"
+
+
+# Custom formatter with colors for WARNING and ERROR only
+class ColoredFormatter(logging.Formatter):
+    """Custom formatter that colors entire log line except message for WARNING and ERROR levels."""
+
+    def format(self, record):  # pragma: no cover
+        # Format the record first
+        formatted = super().format(record)
+
+        # Add color to the entire line for WARNING and ERROR
+        if record.levelno == logging.WARNING:
+            # Split at the message to only color the prefix
+            # Format is: [name] LEVEL [timestamp] message
+            # Color everything before the message
+            parts = formatted.split(
+                "] ", 2
+            )  # Split into [name, LEVEL [timestamp, message]
+            if len(parts) == 3:
+                colored_prefix = (
+                    f"{ColorCodes.WARNING}{parts[0]}] {parts[1]}]{ColorCodes.RESET}"
+                )
+                formatted = f"{colored_prefix} {parts[2]}"
+            else:
+                # Fallback: color entire line
+                formatted = f"{ColorCodes.WARNING}{formatted}{ColorCodes.RESET}"
+
+        elif record.levelno >= logging.ERROR:  # ERROR and CRITICAL
+            parts = formatted.split("] ", 2)
+            if len(parts) == 3:
+                colored_prefix = (
+                    f"{ColorCodes.ERROR}{parts[0]}] {parts[1]}]{ColorCodes.RESET}"
+                )
+                formatted = f"{colored_prefix} {parts[2]}"
+            else:
+                # Fallback: color entire line
+                formatted = f"{ColorCodes.ERROR}{formatted}{ColorCodes.RESET}"
+
+        return formatted
+
+
+# Create a handler ONLY for pyEDITH
+handler = logging.StreamHandler()
+formatter = ColoredFormatter(
+    "[%(name)s] %(levelname)s [%(asctime)s] %(message)s",
+)
+handler.setFormatter(formatter)
+
+
+# Create pyEDITH logger
+pyedith_logger = logging.getLogger("pyEDITH")
+pyedith_logger.addHandler(handler)
+pyedith_logger.propagate = True
+
+
+def set_verbosity(level="warning"):
+    """
+    Set the verbosity level for pyEDITH+yippy logging.
+
+    Parameters
+    ----------
+    level : str, optional
+        Verbosity level. Options are:
+        - 'error' or 'quiet': Only show errors
+        - 'warning' or 'default': Show warnings and errors (default)
+        - 'info' or 'verbose': Show info, warnings, and errors
+        - 'debug': Show all messages including debug
+    """
+    level_map = {
+        "error": logging.ERROR,
+        "quiet": logging.ERROR,
+        "warning": logging.WARNING,
+        "default": logging.WARNING,
+        "info": logging.INFO,
+        "verbose": logging.INFO,
+        "debug": logging.DEBUG,
+    }
+
+    log_level = level_map.get(level.lower(), logging.WARNING)
+
+    # Set pyEDITH logger level
+    pyedith_logger.setLevel(log_level)
+    pyedith_logger.info(f"Logging level set to: {logging.getLevelName(log_level)}")
+
+    # Set yippy logger level AND its handlers
+    yippy_logger = logging.getLogger("yippy")
+
+    yippy_logger.setLevel(log_level)
+    yippy_logger.info(f"Logging level set to: {logging.getLevelName(log_level)}")
+
+    yippy_logger.propagate = False  # Don't send to root logger
+    for h in yippy_logger.handlers:
+        h.setLevel(log_level)
+
+
 from .astrophysical_scene import AstrophysicalScene
 from .observation import Observation
 from .observatory import Observatory
@@ -40,3 +146,5 @@ __all__ = [
 ]
 
 __version__ = "1.5.1"
+
+set_verbosity(level="warning")
