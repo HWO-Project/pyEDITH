@@ -38,6 +38,7 @@ class MockObservation:
         self.delta_wavelength = u.Quantity([0.5 * 0.2], u.micron)  # 20% bandpass
         self.SNR = u.Quantity([7], DIMENSIONLESS)
         self.photometric_aperture_radius = 0.85 * LAMBDA_D
+        self.psf_trunc_ratio = 0.3 * DIMENSIONLESS
         self.CRb_multiplier = 2
         self.nlambd = 1
         self.tp = 0.0 * u.s
@@ -333,14 +334,14 @@ def test_calculate_t_photon_count():
     assert np.isclose(result.value, 1.8583934)
 
 
-def test_calculate_exposure_time_or_snr(capsys):
+def test_calculate_exposure_time_or_snr(caplog):
 
     observation = MockObservation()
     scene = MockScene()
     observatory = MockObservatory()
 
     # Test exposure time calculation
-    calculate_exposure_time_or_snr(observation, scene, observatory, verbose=False)
+    calculate_exposure_time_or_snr(observation, scene, observatory)
     assert hasattr(observation, "exptime")
     assert observation.exptime.unit == (u.s)
     assert np.isclose(observation.exptime.value, 252301.15315671)
@@ -348,7 +349,7 @@ def test_calculate_exposure_time_or_snr(capsys):
     # Test SNR calculation
     observation.obstime = 10 * u.hr
     calculate_exposure_time_or_snr(
-        observation, scene, observatory, verbose=False, mode="signal_to_noise"
+        observation, scene, observatory, mode="signal_to_noise"
     )
     assert hasattr(observation, "fullsnr")
     assert observation.fullsnr.unit == (u.dimensionless_unscaled)
@@ -359,126 +360,166 @@ def test_calculate_exposure_time_or_snr(capsys):
     observatory.detector.t_photon_count_input = 1.0 * SECOND / FRAME
 
     # Run calculation with ETC_validation=True
-    calculate_exposure_time_or_snr(
-        observation, scene, observatory, verbose=False, ETC_validation=True
-    )
+    with caplog.at_level(logging.DEBUG, logger="pyEDITH"):
+        calculate_exposure_time_or_snr(
+            observation, scene, observatory, ETC_validation=True
+        )
     # Check that det_npix and t_photon_count were fixed to input values
     assert np.isclose(observation.validation_variables[0]["det_npix"].value, 100)
     assert np.isclose(observation.validation_variables[0]["t_photon_count"].value, 1.0)
 
     # INFINITY CASES
     # Case 1: Planet outside OWA
-    observatory.coronagraph.maximum_OWA = 0.5 * LAMBDA_D
-    calculate_exposure_time_or_snr(observation, scene, observatory, verbose=False)
-    assert np.isinf(observation.exptime[0])
-    captured = capsys.readouterr()
-    assert (
-        "WARNING: Planet outside OWA or inside IWA. Hardcoded infinity results."
-        in captured.out
-    )
-    ## Same for SNR
-    calculate_exposure_time_or_snr(
-        observation, scene, observatory, verbose=False, mode="signal_to_noise"
-    )
-    assert np.isinf(observation.fullsnr[0])
-    captured = capsys.readouterr()
-    assert (
-        "WARNING: Planet outside OWA or inside IWA. Hardcoded infinity results."
-        in captured.out
-    )
-
-    observatory.coronagraph.maximum_OWA = 60.0 * LAMBDA_D  # Reset to original value
-
-    # Case 2: Planet inside IWA
-    observatory.coronagraph.minimum_IWA = 10.0 * LAMBDA_D
-    calculate_exposure_time_or_snr(observation, scene, observatory, verbose=False)
-    assert np.isinf(observation.exptime[0])
-    captured = capsys.readouterr()
-    assert (
-        "WARNING: Planet outside OWA or inside IWA. Hardcoded infinity results."
-        in captured.out
-    )
-    ## Same for SNR
-    calculate_exposure_time_or_snr(
-        observation, scene, observatory, verbose=False, mode="signal_to_noise"
-    )
-    assert np.isinf(observation.fullsnr[0])
-    captured = capsys.readouterr()
-    assert (
-        "WARNING: Planet outside OWA or inside IWA. Hardcoded infinity results."
-        in captured.out
-    )
-    observatory.coronagraph.minimum_IWA = 1.0 * LAMBDA_D  # Reset to original value
-
-    # Case 3: Photometric aperture not large enough
-    original_omega_lod = observatory.coronagraph.omega_lod.copy()
-    observatory.coronagraph.omega_lod = u.Quantity(
-        np.zeros_like(original_omega_lod), LAMBDA_D**2
-    )
-    calculate_exposure_time_or_snr(observation, scene, observatory, verbose=False)
-    assert np.isinf(observation.exptime[0])
-    captured = capsys.readouterr()
-    assert (
-        "WARNING: Photometric aperture is not large enough. Hardcoded infinity results."
-        in captured.out
-    )
-    ## same for SNR
-    calculate_exposure_time_or_snr(
-        observation, scene, observatory, verbose=False, mode="signal_to_noise"
-    )
-    assert np.isinf(observation.fullsnr[0])
-    captured = capsys.readouterr()
-    assert (
-        "WARNING: Photometric aperture is not large enough. Hardcoded infinity results."
-        in captured.out
-    )
-    observatory.coronagraph.omega_lod = original_omega_lod  # Reset to original value
-
-    # Case 4: Count rate of the planet smaller than the noise floor
-    original_noisefloor = observatory.coronagraph.noisefloor.copy()
-    observatory.coronagraph.noisefloor = u.Quantity(
-        np.ones_like(original_noisefloor) * 1e10, DIMENSIONLESS
-    )
-    calculate_exposure_time_or_snr(observation, scene, observatory, verbose=False)
-    assert np.isinf(observation.exptime[0])
-    captured = capsys.readouterr()
-    assert (
-        "WARNING: Count rate of the planet smaller than the noise floor. Hardcoded infinity results."
-        in captured.out
-    )
-    observatory.coronagraph.noisefloor = original_noisefloor  # Reset to original value
-
-    # Case 5: Negative exposure time (does not make sense)
-    # This case doesn't print a warning, it just sets the exposure time to infinity
-    original_toverhead_fixed = observatory.telescope.toverhead_fixed
-    observatory.telescope.toverhead_fixed = -1000000 * u.s  # just to make the test fail
-    calculate_exposure_time_or_snr(observation, scene, observatory, verbose=False)
-    assert np.isinf(observation.exptime[0])
-    observatory.telescope.toverhead_fixed = (
-        original_toverhead_fixed  # Reset to original value
-    )
-
-    # Case 6: Exposure time beyond td_limit
-    # This case doesn't print a warning, it just sets the exposure time to infinity
-    original_td_limit = observation.td_limit
-    observation.td_limit = 1 * u.s
-    calculate_exposure_time_or_snr(observation, scene, observatory, verbose=False)
-    assert np.isinf(observation.exptime[0])
-    observation.td_limit = original_td_limit  # Reset to original value
-
-    # Invalid observing mode
-    with pytest.raises(
-        ValueError, match="Invalid mode. Use 'exposure_time' or 'signal_to_noise'."
-    ):
-        calculate_exposure_time_or_snr(
-            observation, scene, observatory, verbose=False, mode="invalid"
+    with caplog.at_level(logging.WARNING, logger="pyEDITH"):
+        observatory.coronagraph.maximum_OWA = 0.5 * LAMBDA_D
+        calculate_exposure_time_or_snr(observation, scene, observatory)
+        assert np.isinf(observation.exptime[0])
+        assert any(
+            "Planet outside OWA or inside IWA. Hardcoded infinity results."
+            in record.message
+            for record in caplog.records
+            if record.levelno == logging.ERROR
         )
+
+        ## Same for SNR
+        caplog.clear()
+        calculate_exposure_time_or_snr(
+            observation, scene, observatory, mode="signal_to_noise"
+        )
+
+        assert np.isinf(observation.fullsnr[0])
+        assert any(
+            "Planet outside OWA or inside IWA. Hardcoded infinity results."
+            in record.message
+            for record in caplog.records
+            if record.levelno == logging.ERROR
+        )
+
+        observatory.coronagraph.maximum_OWA = 60.0 * LAMBDA_D  # Reset to original value
+
+        # Case 2: Planet inside IWA
+        caplog.clear()
+        observatory.coronagraph.minimum_IWA = 10.0 * LAMBDA_D
+        calculate_exposure_time_or_snr(observation, scene, observatory)
+        assert np.isinf(observation.exptime[0])
+        assert any(
+            "Planet outside OWA or inside IWA. Hardcoded infinity results."
+            in record.message
+            for record in caplog.records
+            if record.levelno == logging.ERROR
+        )
+
+        ## Same for SNR
+        caplog.clear()
+        calculate_exposure_time_or_snr(
+            observation, scene, observatory, mode="signal_to_noise"
+        )
+        assert np.isinf(observation.fullsnr[0])
+        assert any(
+            "Planet outside OWA or inside IWA. Hardcoded infinity results."
+            in record.message
+            for record in caplog.records
+            if record.levelno == logging.ERROR
+        )
+        observatory.coronagraph.minimum_IWA = 1.0 * LAMBDA_D  # Reset to original value
+
+        # Case 3: Photometric aperture not large enough
+        caplog.clear()
+        original_omega_lod = observatory.coronagraph.omega_lod.copy()
+        observatory.coronagraph.omega_lod = u.Quantity(
+            np.zeros_like(original_omega_lod), LAMBDA_D**2
+        )
+        calculate_exposure_time_or_snr(observation, scene, observatory)
+        assert np.isinf(observation.exptime[0])
+        assert any(
+            "Photometric aperture is not large enough. Hardcoded infinity results."
+            in record.message
+            for record in caplog.records
+            if record.levelno == logging.ERROR
+        )
+
+        ## same for SNR
+        caplog.clear()
+        calculate_exposure_time_or_snr(
+            observation, scene, observatory, mode="signal_to_noise"
+        )
+        assert np.isinf(observation.fullsnr[0])
+        assert any(
+            "Photometric aperture is not large enough. Hardcoded infinity results."
+            in record.message
+            for record in caplog.records
+            if record.levelno == logging.ERROR
+        )
+
+        observatory.coronagraph.omega_lod = (
+            original_omega_lod  # Reset to original value
+        )
+
+        # Case 4: Count rate of the planet smaller than the noise floor
+        caplog.clear()
+        original_noisefloor = observatory.coronagraph.noisefloor.copy()
+        observatory.coronagraph.noisefloor = u.Quantity(
+            np.ones_like(original_noisefloor) * 1e10, DIMENSIONLESS
+        )
+        calculate_exposure_time_or_snr(observation, scene, observatory)
+        assert any(
+            "Count rate of the planet smaller than the noise floor. Hardcoded infinity results."
+            in record.message
+            for record in caplog.records
+            if record.levelno == logging.ERROR
+        )
+        assert np.isinf(observation.exptime[0])
+
+        observatory.coronagraph.noisefloor = (
+            original_noisefloor  # Reset to original value
+        )
+
+        # Case 5: Negative exposure time (does not make sense)
+        # This case doesn't print a warning, it just sets the exposure time to infinity
+        original_toverhead_fixed = observatory.telescope.toverhead_fixed
+        observatory.telescope.toverhead_fixed = (
+            -1000000 * u.s
+        )  # just to make the test fail
+        calculate_exposure_time_or_snr(observation, scene, observatory)
+        assert np.isinf(observation.exptime[0])
+        observatory.telescope.toverhead_fixed = (
+            original_toverhead_fixed  # Reset to original value
+        )
+
+        # Case 6: Exposure time beyond td_limit
+        # This case doesn't print a warning, it just sets the exposure time to infinity
+        original_td_limit = observation.td_limit
+        observation.td_limit = 1 * u.s
+        calculate_exposure_time_or_snr(observation, scene, observatory)
+        assert np.isinf(observation.exptime[0])
+        observation.td_limit = original_td_limit  # Reset to original value
+
+        # Case 7: Planet outisde coronagraph YIP image
+        scene.xp = 10 * u.arcsec  # make the planet very far
+        calculate_exposure_time_or_snr(observation, scene, observatory)
+        assert any(
+            "Planet outside coronagraph YIP image. Hardcoded infinity results."
+            in record.message
+            for record in caplog.records
+            if record.levelno == logging.ERROR
+        )
+        assert np.isinf(observation.exptime[0])
+        scene.xp = 0.0628 * u.arcsec  # restore original
+
+        # Invalid observing mode
+        with pytest.raises(
+            ValueError, match="Invalid mode. Use 'exposure_time' or 'signal_to_noise'."
+        ):
+            calculate_exposure_time_or_snr(
+                observation, scene, observatory, mode="invalid"
+            )
 
     # Testing verbose output
     with patch(
         "pyEDITH.exposure_time_calculator.utils.print_all_variables"
     ) as mock_print:
-        calculate_exposure_time_or_snr(observation, scene, observatory, verbose=True)
+        with caplog.at_level(logging.DEBUG, logger="pyEDITH"):
+            calculate_exposure_time_or_snr(observation, scene, observatory)
 
         # Assert that print_all_variables was called
         mock_print.assert_called()
@@ -490,45 +531,40 @@ def test_calculate_exposure_time_or_snr(capsys):
         assert args[2] == observatory
         # You can add more assertions for other arguments if needed
 
-    # Test that it's not called when verbose is False
-    with patch(
-        "pyEDITH.exposure_time_calculator.utils.print_all_variables"
-    ) as mock_print:
-        calculate_exposure_time_or_snr(observation, scene, observatory, verbose=False)
-        mock_print.assert_not_called()
+        # Bandwidth restriction warning
+        observation.wavelength = [0.5] * u.um
+        observation.nlambd = 1
+        observatory.observing_mode = "IMAGER"
+        observatory.coronagraph.bandwidth = 1.0
+        observatory.coronagraph.coronagraph_spectral_resolution = 10
 
-    # Bandwidth restriction warning
-    observation.wavelength = [0.5] * u.um
-    observation.nlambd = 1
-    observatory.observing_mode = "IMAGER"
-    observatory.coronagraph.bandwidth = 1.0
-    observatory.coronagraph.coronagraph_spectral_resolution = 10
+        calculate_exposure_time_or_snr(observation, scene, observatory)
+        assert any(
+            "Bandwidth larger than what the coronagraph allows. Selecting widest possible bandwidth..."
+            in record.message
+            for record in caplog.records
+            if record.levelno == logging.WARNING
+        )
 
-    calculate_exposure_time_or_snr(observation, scene, observatory, verbose=False)
+        # Check if the bandwidth was correctly adjusted
+        assert np.isclose(
+            observation.validation_variables[0]["deltalambda_nm"].value, 50
+        )
 
-    captured = capsys.readouterr()
-    assert (
-        "WARNING: Bandwidth larger than what the coronagraph allows. Selecting widest possible bandwidth..."
-        in captured.out
-    )
+        # IFS-specific calculations
+        # Correct calculation
+        observatory.observing_mode = "IFS"
+        observation.wavelength = [0.5, 0.6, 0.7] * u.um
 
-    # Check if the bandwidth was correctly adjusted
-    assert np.isclose(observation.validation_variables[0]["deltalambda_nm"].value, 50)
+        calculate_exposure_time_or_snr(observation, scene, observatory)
 
-    # IFS-specific calculations
-    # Correct calculation
-    observatory.observing_mode = "IFS"
-    observation.wavelength = [0.5, 0.6, 0.7] * u.um
+        # Invalid observing mode
+        observatory.observing_mode = "INVALID"
 
-    calculate_exposure_time_or_snr(observation, scene, observatory, verbose=False)
-
-    # Invalid observing mode
-    observatory.observing_mode = "INVALID"
-
-    with pytest.raises(
-        ValueError, match="Invalid observation mode. Choose 'IMAGER' or 'IFS'."
-    ):
-        calculate_exposure_time_or_snr(observation, scene, observatory, verbose=False)
+        with pytest.raises(
+            ValueError, match="Invalid observation mode. Choose 'IMAGER' or 'IFS'."
+        ):
+            calculate_exposure_time_or_snr(observation, scene, observatory)
 
 
 def test_measure_coronagraph_performance_at_IWA():
@@ -541,6 +577,7 @@ def test_measure_coronagraph_performance_at_IWA():
     coronagraph.skytrans = np.ones((100, 100)) * 0.9 * DIMENSIONLESS
     coronagraph.omega_lod = np.ones((100, 100, 1)) * 2 * LAMBDA_D**2
     coronagraph.npix = 100
+
     coronagraph.xcenter = 50 * PIXEL
     coronagraph.ycenter = 50 * PIXEL
 

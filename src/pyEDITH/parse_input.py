@@ -5,6 +5,9 @@ import numpy as np
 from .units import *
 import pandas as pd
 import os
+import logging
+
+logger = logging.getLogger("pyEDITH")
 
 
 def parse_input_file(
@@ -211,8 +214,8 @@ def parse_parameters(parameters: dict, nlambda: int = None) -> dict:
         if default_len > 1:
             # Case 1 & 1a: default_len > 1 but value is a pure scalar (including Quantity scalar)
             if np.isscalar(value) or (isinstance(value, u.Quantity) and value.isscalar):
-                print(
-                    f"WARNING: {key} should be a list of length {default_len}. pyEDITH will create one assuming the input value for all the elements of the list."
+                logger.warning(
+                    f"{key} should be a list of length {default_len}. pyEDITH will create one assuming the input value for all the elements of the list."
                 )
                 if isinstance(value, u.Quantity):
                     return u.Quantity(np.full(default_len, value.value), value.unit)
@@ -235,15 +238,15 @@ def parse_parameters(parameters: dict, nlambda: int = None) -> dict:
             # Case 3: default_len == 1, return a single element array
             if isinstance(value, u.Quantity):
                 if value.size > 1:
-                    print(
-                        f"WARNING: {key} should be a list of length 1 but you assigned multiple values. pyEDITH will create a list assuming only the first input value."
+                    logger.warning(
+                        f"{key} should be a list of length 1 but you assigned multiple values. pyEDITH will create a list assuming only the first input value."
                     )
                     return u.Quantity([value[0].value], value.unit)
                 else:
                     return u.Quantity([value.value], value.unit)
             elif isinstance(value, (list, np.ndarray)) and len(value) > 1:
-                print(
-                    f"WARNING: {key} should be a list of length 1 but you assigned multiple values. pyEDITH will create a list assuming only the first input value."
+                logger.warning(
+                    f"{key} should be a list of length 1 but you assigned multiple values. pyEDITH will create a list assuming only the first input value."
                 )
                 return to_float_array([value[0]])
             else:
@@ -463,11 +466,11 @@ def print_observatory_config(config: Union[str, Dict[str, str]]) -> None:
         a dictionary (custom configuration)
     """
 
-    print("Observatory Configuration:")
+    logger.info("Observatory Configuration:")
     if isinstance(config, str):
-        print(f"  Using preset: {config}")
+        logger.info(f"  Using preset: {config}")
     else:
-        print(f"  Telescope:   {config['telescope']}")
-        print(f"  Coronagraph: {config['coronagraph']}")
-        print(f"  Detector:    {config['detector']}")
-    print()  # Add a blank line for better readability
+        logger.info(f"  Telescope:   {config['telescope']}")
+        logger.info(f"  Coronagraph: {config['coronagraph']}")
+        logger.info(f"  Detector:    {config['detector']}")
+    logger.info("")  # Add a blank line for better readability

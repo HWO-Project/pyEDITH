@@ -1,6 +1,9 @@
 import numpy as np
 from .units import *
 from . import utils
+import logging
+
+logger = logging.getLogger("pyEDITH")
 
 
 class Observation:
@@ -14,7 +17,7 @@ class Observation:
 
     Parameters
     -----------
-    lambd : np.ndarray
+    wavelength : np.ndarray
         Wavelength array (in microns).
     nlambd : int
         Number of wavelength points.
@@ -87,8 +90,8 @@ class Observation:
             )  # calculate the resolution from the wavelength grid
             dlam_um = np.gradient(self.wavelength)
             if ~np.isfinite(IFS_resolution).any():
-                print(
-                    "WARNING: Wavelength grid is not valid. Using default spectral resolution of 140."
+                logger.warning(
+                    "Wavelength grid is not valid. Using default spectral resolution of 140."
                 )
                 IFS_resolution = 140 * np.ones_like(
                     self.wavelength
@@ -100,7 +103,7 @@ class Observation:
             parameters["observing_mode"] == "IFS"
             and parameters["regrid_wavelength"] is True
         ):
-            print("Calculating a new wavelength grid and re-gridding spectra...")
+            logger.info("Calculating a new wavelength grid and re-gridding spectra...")
             if "spectral_resolution" not in parameters.keys():
                 raise KeyError(
                     "regrid_wavelength is True; you must specify new resolution for each spectral channel: parameters['spectral_resolution']."
@@ -150,7 +153,7 @@ class Observation:
             and parameters["photometric_aperture_radius"] is not None
             and parameters["psf_trunc_ratio"] is not None
         ):
-            print(
+            logger.warning(
                 "Warning: Both 'photometric_aperture_radius' and 'psf_trunc_ratio' provided. Using 'psf_trunc_ratio' and ignoring 'photometric_aperture_radius'."
             )
             self.photometric_aperture_radius = (

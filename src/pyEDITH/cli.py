@@ -2,10 +2,13 @@ from pyEDITH import AstrophysicalScene, Observation, ObservatoryBuilder
 from pyEDITH import calculate_exposure_time_or_snr, parse_input
 from argparse import ArgumentParser
 import numpy as np
-import astropy.units as u
+from .units import *
 import sys
-
+from . import set_verbosity
 import os
+import logging
+
+logger = logging.getLogger("pyEDITH")
 
 # Declare the environment variable
 # os.environ["SCI_ENG_DIR"] = "/path/to/Sci-Eng-Interface/hwo_sci_eng"
@@ -32,10 +35,32 @@ def main():
         If secondary parameters are not specified in etc2snr mode or
         if the returned exposure time is infinity
     """
+    parent_parser = ArgumentParser(add_help=False)
+    parent_parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="Increase verbosity: -v for INFO, -vv for DEBUG logs with detailed output",
+    )
+    parent_parser.add_argument(
+        "-q", "--quiet", action="store_true", help="Quiet mode, only show errors"
+    )
 
     parser = ArgumentParser(
-        description="Available command line arguments for E.D.I.T.H."
+        description="Available command line arguments for E.D.I.T.H.",
     )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="Increase verbosity: -v for INFO, -vv for DEBUG logs with detailed output",
+    )
+    parser.add_argument(
+        "-q", "--quiet", action="store_true", help="Quiet mode, only show errors"
+    )
+
     subparsers = parser.add_subparsers(
         dest="subfunction", help="Subfunction to execute"
     )
@@ -61,21 +86,24 @@ def main():
             calculated on a primary lambda (in .edith file)",
     )
     parser_c.add_argument("--edith", type=str, help="an .edith file")
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="Increase output verbosity",
-        default=False,
-    )
+
     args = parser.parse_args()
+
+    if args.quiet:
+        set_verbosity("error")
+    elif args.verbose == 0:
+        set_verbosity("warning")  # Default
+    elif args.verbose == 1:
+        set_verbosity("info")  # -v
+    else:  # args.verbose >= 2
+        set_verbosity("debug")  # -vv, -vvv, etc.
 
     if args.subfunction == "etc":
         if not args.edith:
             raise SyntaxError("--edith argument is required for etc subfunction.")
 
         parameters, _ = parse_input.read_configuration(args.edith)
-        texp, _ = calculate_texp(parameters, args.verbose)
+        texp, _ = calculate_texp(parameters)
         print(texp)
 
     elif args.subfunction == "snr":
@@ -85,8 +113,8 @@ def main():
             )
 
         parameters, _ = parse_input.read_configuration(args.edith)
-        texp = args.time * u.s
-        snr, _ = calculate_snr(parameters, texp, args.verbose)
+        texp = args.time * TIME
+        snr, _ = calculate_snr(parameters, texp)
         print(snr)
 
     elif args.subfunction == "etc2snr":
@@ -107,13 +135,13 @@ def main():
                 if key not in secondary_parameters:
                     secondary_parameters[key] = parameters[key]
 
-        print("Calculating texp from primary lambda")
-        print(parameters.keys())
-        texp, _ = calculate_texp(parameters, args.verbose)
+        logger.info("Calculating texp from primary lambda")
+        logger.info(parameters.keys())
+        texp, _ = calculate_texp(parameters)
         print("Reference exposure time: ", texp)
         if np.isfinite(texp).all():
-            print("Calculating snr on secondary lambda")
-            snr, _ = calculate_snr(secondary_parameters, texp, args.verbose)
+            logger.info("Calculating snr on secondary lambda")
+            snr, _ = calculate_snr(secondary_parameters, texp)
             print("SNR at the secondary lambda: ", snr)
         else:
             raise ValueError("Returned exposure time is infinity.")
@@ -121,9 +149,7 @@ def main():
         parser.print_help()
 
 
-def calculate_texp(
-    parameters: dict, verbose: bool, ETC_validation: bool = False
-) -> np.array:
+def calculate_texp(parameters: dict, ETC_validation: bool = False) -> np.array:
     """
     Calculate exposure time for a planet observation with specified parameters.
 
@@ -135,8 +161,6 @@ def calculate_texp(
     ----------
     parameters : dict
         Dictionary containing all input parameters for the calculation
-    verbose : bool
-        If True, print detailed calculation information
     ETC_validation : bool, optional
         If True, use specific parameter values for validation against the ETC,
         default is False
@@ -185,7 +209,6 @@ def calculate_texp(
         observation,
         scene,
         observatory,
-        verbose,
         ETC_validation=ETC_validation,
         mode="exposure_time",
     )
@@ -193,7 +216,7 @@ def calculate_texp(
     return observation.exptime, observation.validation_variables
 
 
-def calculate_snr(parameters: dict, reference_texp: float, verbose: bool):
+def calculate_snr(parameters: dict, reference_texp: float):
     """
     Calculate signal-to-noise ratio for a given exposure time.
 
@@ -207,8 +230,6 @@ def calculate_snr(parameters: dict, reference_texp: float, verbose: bool):
         Dictionary containing all input parameters for the calculation
     reference_texp : float
         Reference exposure time in seconds
-    verbose : bool
-        If True, print detailed calculation information
 
     Returns
     -------
@@ -250,8 +271,7 @@ def calculate_snr(parameters: dict, reference_texp: float, verbose: bool):
     # SNR CALCULATION
     observation.obstime = reference_texp
     calculate_exposure_time_or_snr(
-        observation, scene, observatory, verbose, mode="signal_to_noise"
+        observation, scene, observatory, mode="signal_to_noise"
     )
-    # print(istar, coronagraph.type,  edith.exptime[istar][ilambd])
 
     return observation.fullsnr, observation.validation_variables

@@ -6,6 +6,9 @@ from ..units import *
 from scipy.interpolate import interp1d
 from yippy import Coronagraph as yippycoro
 from lod_unit import lod
+import logging
+
+logger = logging.getLogger("pyEDITH")
 
 
 def generate_radii(numx: int, numy: int = 0) -> np.ndarray:
@@ -356,15 +359,15 @@ class ToyModelCoronagraph(Coronagraph):
 
         if "noisefloor_factor" not in parameters.keys():
             if "noisefloor_PPF" in parameters.keys():
-                print(
+                raise KeyError(
                     "Noisefloor_PPF mode not implemented in ToyModel coronagraph. Please use the noisefloor_factor method."
                 )
-            print(
-                "WARNING: noisefloor_factor value not provided. Using the default value: "
+            logger.warning(
+                "noisefloor_factor value not provided. Using the default value: "
                 + str(self.DEFAULT_CONFIG["noisefloor_factor"])
             )
 
-        print(
+        logger.info(
             "Calculating noisefloor by multiplying noisefloor_factor="
             + str(self.noisefloor_factor)
             + ", contrast="
@@ -553,10 +556,11 @@ class CoronagraphYIP(Coronagraph):
                 mediator.get_observation_parameter("photometric_aperture_radius")
                 is not None
             ):
-                print(
-                    "WARNING: Both psf_trunc_ratio and photometric_aperture_radius "
-                    "are specified. Preferring psf_trunc_ratio going forward..."
+                logger.warning(
+                    "Both psf_trunc_ratio and photometric_aperture_radius are "
+                    "specified. Preferring psf_trunc_ratio going forward..."
                 )
+            logger.info("Using psf_trunc_ratio to calculate Omega...")
 
             self.DEFAULT_CONFIG["psf_trunc_ratio"] = np.array(
                 [mediator.get_observation_parameter("psf_trunc_ratio")]
@@ -573,15 +577,15 @@ class CoronagraphYIP(Coronagraph):
             and mediator.get_observation_parameter("photometric_aperture_radius")
             is not None
         ):
-            print("Using photometric_aperture_radius to calculate Omega...")
+            logger.info("Using photometric_aperture_radius to calculate Omega...")
 
             # Use the photometric_aperture_radius method of calculating Omega.
             # this method also requires you to set Tcore or uses the default one (does not use the YIP to calculate this)
             # ***** Tcore *****
             if "Tcore" in parameters.keys():
-                print("Using user-defined Tcore...")
+                logger.info("Using user-defined Tcore...")
             else:
-                print("Using default Tcore...")
+                logger.info("Using default Tcore...")
             setattr(
                 self,
                 "Tcore",
@@ -659,16 +663,17 @@ class CoronagraphYIP(Coronagraph):
             )
 
         if "noisefloor_PPF" in parameters.keys():
+            logger.info("Setting the noise floor via user-supplied noisefloor_PPF...")
             self.DEFAULT_CONFIG["noisefloor_PPF"] = parameters["noisefloor_PPF"]
         else:
             if "noisefloor_factor" in parameters.keys():
-                print(
+                raise ValueError(
                     "Noisefloor_factor mode not implemented in CoronagraphYIP "
                     "coronagraph. Please use the noisefloor_PPF method."
                 )
-            print(
-                "WARNING: noisefloor_PPF value not provided. Using the default "
-                f"value: {self.DEFAULT_CONFIG['noisefloor_PPF']}"
+            logger.warning(
+                "noisefloor_PPF value not provided. Using the default value: "
+                + str(self.DEFAULT_CONFIG["noisefloor_PPF"])
             )
 
         self.DEFAULT_CONFIG["noisefloor"] = (

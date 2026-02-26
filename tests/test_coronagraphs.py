@@ -16,6 +16,7 @@ from pyEDITH.units import (
     ARCSEC,
 )
 from unittest.mock import patch, MagicMock
+import logging
 
 
 class MockMediator_IMAGER:
@@ -173,156 +174,171 @@ def test_toy_model_coronagraph_init():
     assert coronagraph.keyword is None
 
 
-def test_toy_model_coronagraph_load_configuration(capsys):
-    coronagraph = ToyModelCoronagraph()
-    parameters = {
-        "pixscale": 0.3,
-        "minimum_IWA": 2.5,
-        "maximum_OWA": 90.0,
-        "contrast": 1e-10,
-        "noisefloor_factor": 0.05,
-        "bandwidth": 0.1,
-        "Tcore": 0.3,
-        "TLyot": 0.7 * DIMENSIONLESS,
-        "nrolls": 2,
-        "nchannels": 1,
-    }
-    mediator = MockMediator_IMAGER()
+def test_toy_model_coronagraph_load_configuration(caplog):
+    with caplog.at_level(logging.DEBUG, logger="pyEDITH"):
+        coronagraph = ToyModelCoronagraph()
+        parameters = {
+            "pixscale": 0.3,
+            "minimum_IWA": 2.5,
+            "maximum_OWA": 90.0,
+            "contrast": 1e-10,
+            "noisefloor_factor": 0.05,
+            "bandwidth": 0.1,
+            "Tcore": 0.3,
+            "TLyot": 0.7 * DIMENSIONLESS,
+            "nrolls": 2,
+            "nchannels": 1,
+        }
+        mediator = MockMediator_IMAGER()
 
-    coronagraph.load_configuration(parameters, mediator)
+        coronagraph.load_configuration(parameters, mediator)
 
-    assert coronagraph.pixscale == 0.3 * LAMBDA_D
-    assert coronagraph.minimum_IWA == 2.5 * LAMBDA_D
-    assert coronagraph.maximum_OWA == 90.0 * LAMBDA_D
-    assert coronagraph.contrast == 1e-10 * DIMENSIONLESS
-    assert coronagraph.noisefloor_factor == 0.05 * DIMENSIONLESS
-    assert coronagraph.bandwidth == 0.1
-    assert coronagraph.Tcore == 0.3 * DIMENSIONLESS
-    assert coronagraph.TLyot == 0.7 * DIMENSIONLESS
-    assert coronagraph.nrolls == 2
-    assert coronagraph.nchannels == 1
-    assert (
-        coronagraph.coronagraph_optical_throughput == [0.44] * DIMENSIONLESS
-    )  # should grab from default values
-    assert (
-        coronagraph.coronagraph_spectral_resolution == 1 * DIMENSIONLESS
-    )  # should grab from default values
+        assert coronagraph.pixscale == 0.3 * LAMBDA_D
+        assert coronagraph.minimum_IWA == 2.5 * LAMBDA_D
+        assert coronagraph.maximum_OWA == 90.0 * LAMBDA_D
+        assert coronagraph.contrast == 1e-10 * DIMENSIONLESS
+        assert coronagraph.noisefloor_factor == 0.05 * DIMENSIONLESS
+        assert coronagraph.bandwidth == 0.1
+        assert coronagraph.Tcore == 0.3 * DIMENSIONLESS
+        assert coronagraph.TLyot == 0.7 * DIMENSIONLESS
+        assert coronagraph.nrolls == 2
+        assert coronagraph.nchannels == 1
+        assert (
+            coronagraph.coronagraph_optical_throughput == [0.44] * DIMENSIONLESS
+        )  # should grab from default values
+        assert (
+            coronagraph.coronagraph_spectral_resolution == 1 * DIMENSIONLESS
+        )  # should grab from default values
 
-    # Calculated  values
-    assert hasattr(coronagraph, "npsfratios")
-    assert hasattr(coronagraph, "npix")
-    assert hasattr(coronagraph, "xcenter")
-    assert hasattr(coronagraph, "ycenter")
-    assert hasattr(coronagraph, "r")
-    assert hasattr(coronagraph, "omega_lod")
-    assert hasattr(coronagraph, "skytrans")
-    assert hasattr(coronagraph, "photometric_aperture_throughput")
-    assert hasattr(coronagraph, "PSFpeak")
-    assert hasattr(coronagraph, "Istar")
-    assert hasattr(coronagraph, "noisefloor")
+        # Calculated  values
+        assert hasattr(coronagraph, "npsfratios")
+        assert hasattr(coronagraph, "npix")
+        assert hasattr(coronagraph, "xcenter")
+        assert hasattr(coronagraph, "ycenter")
+        assert hasattr(coronagraph, "r")
+        assert hasattr(coronagraph, "omega_lod")
+        assert hasattr(coronagraph, "skytrans")
+        assert hasattr(coronagraph, "photometric_aperture_throughput")
+        assert hasattr(coronagraph, "PSFpeak")
+        assert hasattr(coronagraph, "Istar")
+        assert hasattr(coronagraph, "noisefloor")
 
-    # Test calculated values
-    assert coronagraph.npix == 400
-    assert coronagraph.xcenter == 200 * PIXEL
-    assert coronagraph.ycenter == 200 * PIXEL
+        # Test calculated values
+        assert coronagraph.npix == 400
+        assert coronagraph.xcenter == 200 * PIXEL
+        assert coronagraph.ycenter == 200 * PIXEL
 
-    # Check r
-    assert coronagraph.r.shape == (coronagraph.npix, coronagraph.npix)
-    assert np.isclose(
-        coronagraph.r[0, 0],
-        84.641,
-    )
+        # Check r
+        assert coronagraph.r.shape == (coronagraph.npix, coronagraph.npix)
+        assert np.isclose(
+            coronagraph.r[0, 0],
+            84.641,
+        )
 
-    # Check omega_lod
-    assert coronagraph.omega_lod.shape == (coronagraph.npix, coronagraph.npix, 1)
-    assert np.all(coronagraph.omega_lod == np.pi * 0.7**2 * LAMBDA_D**2)
+        # Check omega_lod
+        assert coronagraph.omega_lod.shape == (coronagraph.npix, coronagraph.npix, 1)
+        assert np.all(coronagraph.omega_lod == np.pi * 0.7**2 * LAMBDA_D**2)
 
-    # Check skytrans
-    assert coronagraph.skytrans.shape == (coronagraph.npix, coronagraph.npix)
-    assert np.all(coronagraph.skytrans == 0.7 * DIMENSIONLESS)
+        # Check skytrans
+        assert coronagraph.skytrans.shape == (coronagraph.npix, coronagraph.npix)
+        assert np.all(coronagraph.skytrans == 0.7 * DIMENSIONLESS)
 
-    # Check photometric_aperture_throughput
-    assert coronagraph.photometric_aperture_throughput.shape == (
-        coronagraph.npix,
-        coronagraph.npix,
-        1,
-    )
-    assert np.all(
-        (coronagraph.photometric_aperture_throughput == 0.3 * DIMENSIONLESS)
-        | (coronagraph.photometric_aperture_throughput == 0.0 * DIMENSIONLESS)
-    )
-    assert np.all(
-        coronagraph.photometric_aperture_throughput[
-            coronagraph.r < coronagraph.minimum_IWA
-        ]
-        == 0.0 * DIMENSIONLESS
-    )
-    assert np.all(
-        coronagraph.photometric_aperture_throughput[
-            coronagraph.r > coronagraph.maximum_OWA
-        ]
-        == 0.0 * DIMENSIONLESS
-    )
+        # Check photometric_aperture_throughput
+        assert coronagraph.photometric_aperture_throughput.shape == (
+            coronagraph.npix,
+            coronagraph.npix,
+            1,
+        )
+        assert np.all(
+            (coronagraph.photometric_aperture_throughput == 0.3 * DIMENSIONLESS)
+            | (coronagraph.photometric_aperture_throughput == 0.0 * DIMENSIONLESS)
+        )
+        assert np.all(
+            coronagraph.photometric_aperture_throughput[
+                coronagraph.r < coronagraph.minimum_IWA
+            ]
+            == 0.0 * DIMENSIONLESS
+        )
+        assert np.all(
+            coronagraph.photometric_aperture_throughput[
+                coronagraph.r > coronagraph.maximum_OWA
+            ]
+            == 0.0 * DIMENSIONLESS
+        )
 
-    # Check PSFpeak
-    assert np.isclose(coronagraph.PSFpeak, 0.025 * 0.7 * DIMENSIONLESS)
+        # Check PSFpeak
+        assert np.isclose(coronagraph.PSFpeak, 0.025 * 0.7 * DIMENSIONLESS)
 
-    # Check Istar
-    assert coronagraph.Istar.shape == (coronagraph.npix, coronagraph.npix)
-    assert np.allclose(coronagraph.Istar.value, 1e-10 * 0.025 * 0.7, rtol=1e-6)
-    assert coronagraph.Istar.unit == DIMENSIONLESS
+        # Check Istar
+        assert coronagraph.Istar.shape == (coronagraph.npix, coronagraph.npix)
+        assert np.allclose(coronagraph.Istar.value, 1e-10 * 0.025 * 0.7, rtol=1e-6)
+        assert coronagraph.Istar.unit == DIMENSIONLESS
 
-    # Check noisefloor
-    captured = capsys.readouterr()
-    assert (
-        "Calculating noisefloor by multiplying noisefloor_factor=0.05, contrast=1e-10, PSFpeak="
-        + str(0.025 * 0.7)
-        in captured.out
-    )
+        # Check noisefloor
+        assert any(
+            "Calculating noisefloor by multiplying noisefloor_factor=0.05, contrast=1e-10, PSFpeak="
+            + str(0.025 * 0.7)
+            in record.message
+            for record in caplog.records
+            if record.levelno == logging.INFO
+        )
 
-    assert coronagraph.noisefloor.shape == (coronagraph.npix, coronagraph.npix)
-    assert np.allclose(
-        coronagraph.noisefloor.value, 0.05 * 1e-10 * 0.025 * 0.7, rtol=1e-6
-    )
-    assert coronagraph.noisefloor.unit == DIMENSIONLESS
+        assert coronagraph.noisefloor.shape == (coronagraph.npix, coronagraph.npix)
+        assert np.allclose(
+            coronagraph.noisefloor.value, 0.05 * 1e-10 * 0.025 * 0.7, rtol=1e-6
+        )
+        assert coronagraph.noisefloor.unit == DIMENSIONLESS
 
-    # test noisefloor with noisefloor_factor not provided, but PPF is
-    parameters2 = {
-        "pixscale": 0.3,
-        "minimum_IWA": 2.5,
-        "maximum_OWA": 90.0,
-        "contrast": 1e-10,
-        "bandwidth": 0.1,
-        "Tcore": 0.3,
-        "TLyot": 0.7,
-        "nrolls": 2,
-        "nchannels": 1,
-        "noisefloor_PPF": 30,
-    }
-    mediator = MockMediator_IMAGER()
-    coronagraph.load_configuration(parameters2, mediator)
-    captured = capsys.readouterr()
+        # test noisefloor with noisefloor_factor not provided, but PPF is
+        parameters2 = {
+            "pixscale": 0.3,
+            "minimum_IWA": 2.5,
+            "maximum_OWA": 90.0,
+            "contrast": 1e-10,
+            "bandwidth": 0.1,
+            "Tcore": 0.3,
+            "TLyot": 0.7,
+            "nrolls": 2,
+            "nchannels": 1,
+            "noisefloor_PPF": 30,
+        }
+        mediator = MockMediator_IMAGER()
 
-    assert (
-        "Noisefloor_PPF mode not implemented in ToyModel coronagraph. Please use the noisefloor_factor method."
-        in captured.out
-    )
-    assert (
-        "WARNING: noisefloor_factor value not provided. Using the default value: 0.03"
-        in captured.out
-    )
+        with pytest.raises(
+            KeyError,
+            match="Noisefloor_PPF mode not implemented in ToyModel coronagraph. Please use the noisefloor_factor method.",
+        ):
+            coronagraph.load_configuration(parameters2, mediator)
 
-    assert (
-        "Calculating noisefloor by multiplying noisefloor_factor=0.03, contrast=1e-10, PSFpeak="
-        + str(0.025 * 0.7)
-        in captured.out
-    )
+        # test default noisefloor_factor (warnings)
+        caplog.clear()
+        parameters2 = {
+            "pixscale": 0.3,
+            "minimum_IWA": 2.5,
+            "maximum_OWA": 90.0,
+            "contrast": 1e-10,
+            "bandwidth": 0.1,
+            "Tcore": 0.3,
+            "TLyot": 0.7,
+            "nrolls": 2,
+            "nchannels": 1,
+        }
+        coronagraph.load_configuration(parameters2, mediator)
+        assert any(
+            "noisefloor_factor value not provided. Using the default value: 0.03"
+            in record.message
+            for record in caplog.records
+            if record.levelno == logging.WARNING
+        )
+        assert any(
+            "Calculating noisefloor by multiplying noisefloor_factor=0.03, contrast=1e-10, PSFpeak="
+            + str(0.025 * 0.7)
+            in record.message
+            for record in caplog.records
+            if record.levelno == logging.INFO
+        )
 
-    assert coronagraph.noisefloor.shape == (coronagraph.npix, coronagraph.npix)
-    assert np.allclose(
-        coronagraph.noisefloor.value, 0.03 * 1e-10 * 0.025 * 0.7, rtol=1e-6
-    )
-    assert coronagraph.noisefloor.unit == DIMENSIONLESS
+        assert coronagraph.noisefloor.unit == DIMENSIONLESS
 
 
 def test_coronagraph_yip_init():
@@ -438,144 +454,151 @@ def test_coronagraph_yip_load_configuration_IMAGER(
     mock_yippy_object,
     mock_instrument,
     mock_telescope,
-    capsys,
+    caplog,
 ):
-    mock_load_instrument.return_value = mock_instrument
-    mock_load_telescope.return_value = mock_telescope
-    mock_yippycoro.return_value = mock_yippy_object
+    with caplog.at_level(logging.DEBUG, logger="pyEDITH"):
+        mock_load_instrument.return_value = mock_instrument
+        mock_load_telescope.return_value = mock_telescope
+        mock_yippycoro.return_value = mock_yippy_object
 
-    coronagraph = CoronagraphYIP(path="test_path")
-    parameters = {
-        "observing_mode": "IMAGER",
-        "maximum_OWA": 90.0,
-        "bandwidth": 0.1,
-        "nrolls": 2,
-        "nchannels": 1,
-        "az_avg": True,
-    }
+        coronagraph = CoronagraphYIP(path="test_path")
+        parameters = {
+            "observing_mode": "IMAGER",
+            "maximum_OWA": 90.0,
+            "bandwidth": 0.1,
+            "nrolls": 2,
+            "nchannels": 1,
+            "az_avg": True,
+        }
 
-    mediator = MockMediatorWithHighPSFTruncRatio()
+        mediator = MockMediatorWithHighPSFTruncRatio()
 
-    coronagraph.load_configuration(parameters, mediator)
+        coronagraph.load_configuration(parameters, mediator)
 
-    # Check parameters from yippy + overwritten parameters
-    assert coronagraph.pixscale == 0.25 * LAMBDA_D  # This comes from mock_yippy_object
-    assert coronagraph.minimum_IWA == 2.0 * LAMBDA_D  # Default
-    assert (
-        coronagraph.maximum_OWA == 90.0 * LAMBDA_D
-    )  # Overwritten value from parameters
-    assert coronagraph.bandwidth == 0.1  # Overwritten value from parameters
-    assert coronagraph.nrolls == 2
-    assert coronagraph.nchannels == 1
-    assert coronagraph.az_avg == True
+        # Check parameters from yippy + overwritten parameters
+        assert (
+            coronagraph.pixscale == 0.25 * LAMBDA_D
+        )  # This comes from mock_yippy_object
+        assert coronagraph.minimum_IWA == 2.0 * LAMBDA_D  # Default
+        assert (
+            coronagraph.maximum_OWA == 90.0 * LAMBDA_D
+        )  # Overwritten value from parameters
+        assert coronagraph.bandwidth == 0.1  # Overwritten value from parameters
+        assert coronagraph.nrolls == 2
+        assert coronagraph.nchannels == 1
+        assert coronagraph.az_avg == True
 
-    # Check calculated values
-    assert coronagraph.npix == 100  # This comes from mock_yippy_object
-    assert coronagraph.xcenter == 50 * PIXEL
-    assert coronagraph.ycenter == 50 * PIXEL
+        # Check calculated values
+        assert coronagraph.npix == 100  # This comes from mock_yippy_object
+        assert coronagraph.xcenter == 50 * PIXEL
+        assert coronagraph.ycenter == 50 * PIXEL
 
-    assert hasattr(coronagraph, "npix")
-    assert hasattr(coronagraph, "xcenter")
-    assert hasattr(coronagraph, "ycenter")
-    assert hasattr(coronagraph, "r")
-    assert hasattr(coronagraph, "omega_lod")
-    assert hasattr(coronagraph, "skytrans")
-    assert hasattr(coronagraph, "photometric_aperture_throughput")
-    assert hasattr(coronagraph, "Istar")
-    assert hasattr(coronagraph, "noisefloor")
+        assert hasattr(coronagraph, "npix")
+        assert hasattr(coronagraph, "xcenter")
+        assert hasattr(coronagraph, "ycenter")
+        assert hasattr(coronagraph, "r")
+        assert hasattr(coronagraph, "omega_lod")
+        assert hasattr(coronagraph, "skytrans")
+        assert hasattr(coronagraph, "photometric_aperture_throughput")
+        assert hasattr(coronagraph, "Istar")
+        assert hasattr(coronagraph, "noisefloor")
 
-    # Check r
-    assert coronagraph.r.shape == (coronagraph.npix, coronagraph.npix)
-    # value of r checked in specific test
+        # Check r
+        assert coronagraph.r.shape == (coronagraph.npix, coronagraph.npix)
+        # value of r checked in specific test
 
-    # Check omega_lod
-    assert coronagraph.omega_lod.shape == (coronagraph.npix, coronagraph.npix, 1)
-    assert coronagraph.omega_lod.unit == LAMBDA_D**2
-    assert not np.all(coronagraph.omega_lod == 0)
+        # Check omega_lod
+        assert coronagraph.omega_lod.shape == (coronagraph.npix, coronagraph.npix, 1)
+        assert coronagraph.omega_lod.unit == LAMBDA_D**2
+        assert not np.all(coronagraph.omega_lod == 0)
 
-    # Check skytrans
-    assert coronagraph.skytrans.shape == (coronagraph.npix, coronagraph.npix)
-    assert np.all(
-        coronagraph.skytrans == mock_yippy_object.sky_trans.return_value * DIMENSIONLESS
-    )
-    assert not np.all(coronagraph.skytrans == 0)
+        # Check skytrans
+        assert coronagraph.skytrans.shape == (coronagraph.npix, coronagraph.npix)
+        assert np.all(
+            coronagraph.skytrans
+            == mock_yippy_object.sky_trans.return_value * DIMENSIONLESS
+        )
+        assert not np.all(coronagraph.skytrans == 0)
 
-    # Check photometric_aperture_throughput
-    assert coronagraph.photometric_aperture_throughput.shape == (
-        coronagraph.npix,
-        coronagraph.npix,
-        1,
-    )
-    assert not np.all(coronagraph.photometric_aperture_throughput == 0)
+        # Check photometric_aperture_throughput
+        assert coronagraph.photometric_aperture_throughput.shape == (
+            coronagraph.npix,
+            coronagraph.npix,
+            1,
+        )
+        assert not np.all(coronagraph.photometric_aperture_throughput == 0)
 
-    # Check Istar
-    assert coronagraph.Istar.shape == (coronagraph.npix, coronagraph.npix)
-    assert not np.all(coronagraph.Istar == 0)
+        # Check Istar
+        assert coronagraph.Istar.shape == (coronagraph.npix, coronagraph.npix)
+        assert not np.all(coronagraph.Istar == 0)
 
-    # Check noisefloor
-    assert coronagraph.noisefloor.shape == (coronagraph.npix, coronagraph.npix)
-    captured = capsys.readouterr()
-    assert (
-        "WARNING: noisefloor_PPF value not provided. Using the default value: 30"
-        in captured.out
-    )
-    assert np.allclose(
-        coronagraph.noisefloor, coronagraph.Istar / 30, rtol=1e-6, atol=1e-9
-    )
+        # Check noisefloor
+        assert coronagraph.noisefloor.shape == (coronagraph.npix, coronagraph.npix)
+        assert coronagraph.noisefloor.unit == DIMENSIONLESS
 
-    # Test with noisefloor_factor
-    parameters = {
-        "observing_mode": "IMAGER",
-        "maximum_OWA": 90.0,
-        "bandwidth": 0.1,
-        "nrolls": 2,
-        "nchannels": 1,
-        "az_avg": True,
-        "noisefloor_factor": 1e-10,
-    }
-    coronagraph.load_configuration(parameters, mediator)
+        assert any(
+            "noisefloor_PPF value not provided. Using the default value: 30"
+            in record.message
+            for record in caplog.records
+            if record.levelno == logging.WARNING
+        )
 
-    captured = capsys.readouterr()
-    assert "Noisefloor_factor mode not implemented in CoronagraphYIP coronagraph. Please use the noisefloor_PPF method."
-    assert (
-        "WARNING: noisefloor_PPF value not provided. Using the default value: 30"
-        in captured.out
-    )
-    assert coronagraph.noisefloor.shape == (coronagraph.npix, coronagraph.npix)
-    assert coronagraph.noisefloor.unit == DIMENSIONLESS
-    assert np.allclose(
-        coronagraph.noisefloor, coronagraph.Istar / 30, rtol=1e-6, atol=1e-9
-    )
+        assert np.allclose(
+            coronagraph.noisefloor, coronagraph.Istar / 30, rtol=1e-6, atol=1e-9
+        )
 
-    # Test with noisefloor_PPF
-    parameters = {
-        "observing_mode": "IMAGER",
-        "maximum_OWA": 90.0,
-        "bandwidth": 0.1,
-        "nrolls": 2,
-        "nchannels": 1,
-        "az_avg": True,
-        "noisefloor_PPF": 35,
-    }
-    coronagraph.load_configuration(parameters, mediator)
-    captured = capsys.readouterr()
+        # Test with noisefloor_factor
+        parameters = {
+            "observing_mode": "IMAGER",
+            "maximum_OWA": 90.0,
+            "bandwidth": 0.1,
+            "nrolls": 2,
+            "nchannels": 1,
+            "az_avg": True,
+            "noisefloor_factor": 1e-10,
+        }
 
-    assert coronagraph.noisefloor.shape == (coronagraph.npix, coronagraph.npix)
-    assert coronagraph.noisefloor.unit == DIMENSIONLESS
-    noisefloor_PPF = coronagraph.noisefloor.copy()
-    assert np.allclose(
-        coronagraph.noisefloor, coronagraph.Istar / 35, rtol=1e-6, atol=1e-9
-    )
+        with pytest.raises(
+            ValueError,
+            match="Noisefloor_factor mode not implemented in CoronagraphYIP coronagraph. Please use the noisefloor_PPF method.",
+        ):
+            coronagraph.load_configuration(parameters, mediator)
 
-    # Check coronagraph_optical_throughput
-    assert len(coronagraph.coronagraph_optical_throughput) == 1
-    assert np.isclose(coronagraph.coronagraph_optical_throughput.value, 0.394770896)
+        # Test with noisefloor_PPF
+        caplog.clear()
+        parameters = {
+            "observing_mode": "IMAGER",
+            "maximum_OWA": 90.0,
+            "bandwidth": 0.1,
+            "nrolls": 2,
+            "nchannels": 1,
+            "az_avg": True,
+            "noisefloor_PPF": 35,
+        }
+        coronagraph.load_configuration(parameters, mediator)
+        assert any(
+            "Setting the noise floor via user-supplied noisefloor_PPF..."
+            in record.message
+            for record in caplog.records
+            if record.levelno == logging.INFO
+        )
 
-    # Check other attributes
-    assert hasattr(coronagraph, "psf_trunc_ratio")
-    assert hasattr(coronagraph, "npsfratios")
-    assert hasattr(coronagraph, "coronagraph_optical_throughput")
-    assert hasattr(coronagraph, "coronagraph_spectral_resolution")
+        assert coronagraph.noisefloor.shape == (coronagraph.npix, coronagraph.npix)
+        assert coronagraph.noisefloor.unit == DIMENSIONLESS
+        noisefloor_PPF = coronagraph.noisefloor.copy()
+        assert np.allclose(
+            coronagraph.noisefloor, coronagraph.Istar / 35, rtol=1e-6, atol=1e-9
+        )
+
+        # Check coronagraph_optical_throughput
+        assert len(coronagraph.coronagraph_optical_throughput) == 1
+        assert np.isclose(coronagraph.coronagraph_optical_throughput.value, 0.394770896)
+
+        # Check other attributes
+        assert hasattr(coronagraph, "psf_trunc_ratio")
+        assert hasattr(coronagraph, "npsfratios")
+        assert hasattr(coronagraph, "coronagraph_optical_throughput")
+        assert hasattr(coronagraph, "coronagraph_spectral_resolution")
 
 
 @patch("eacy.load_instrument")
@@ -588,37 +611,45 @@ def test_coronagraph_yip_load_configuration_IFS(
     mock_yippy_object,
     mock_instrument,
     mock_telescope,
-    capsys,
+    caplog,
 ):
-    mock_load_instrument.return_value = mock_instrument
-    mock_load_telescope.return_value = mock_telescope
-    mock_yippycoro.return_value = mock_yippy_object
+    with caplog.at_level(logging.DEBUG, logger="pyEDITH"):
+        mock_load_instrument.return_value = mock_instrument
+        mock_load_telescope.return_value = mock_telescope
+        mock_yippycoro.return_value = mock_yippy_object
 
-    coronagraph = CoronagraphYIP(path="test_path")
-    parameters = {
-        "observing_mode": "IFS",
-        "maximum_OWA": 90.0,
-        "bandwidth": 0.1,
-        "nrolls": 2,
-        "nchannels": 1,
-        "az_avg": True,
-    }
+        coronagraph = CoronagraphYIP(path="test_path")
+        parameters = {
+            "observing_mode": "IFS",
+            "maximum_OWA": 90.0,
+            "bandwidth": 0.1,
+            "nrolls": 2,
+            "nchannels": 1,
+            "az_avg": True,
+        }
 
-    mediator_ifs = MockMediator_IFS()
+        mediator_ifs = MockMediator_IFS()
 
-    coronagraph.load_configuration(parameters, mediator_ifs)
-    captured = capsys.readouterr()
-    assert (
-        "WARNING: Both psf_trunc_ratio and photometric_aperture_radius are specified. Preferring psf_trunc_ratio going forward..."
-        in captured.out
-    )
+        coronagraph.load_configuration(parameters, mediator_ifs)
+        assert any(
+            "Both psf_trunc_ratio and photometric_aperture_radius are specified. Preferring psf_trunc_ratio going forward..."
+            in record.message
+            for record in caplog.records
+            if record.levelno == logging.WARNING
+        )
 
-    # Check coronagraph_optical_throughput
-    assert len(coronagraph.coronagraph_optical_throughput) == 3
-    assert np.isclose(
-        coronagraph.coronagraph_optical_throughput.value,
-        [0.41891199, 0.43711322, 0.40535648],
-    ).all()
+        assert any(
+            "Using psf_trunc_ratio to calculate Omega..." in record.message
+            for record in caplog.records
+            if record.levelno == logging.INFO
+        )
+
+        # Check coronagraph_optical_throughput
+        assert len(coronagraph.coronagraph_optical_throughput) == 3
+        assert np.isclose(
+            coronagraph.coronagraph_optical_throughput.value,
+            [0.41891199, 0.43711322, 0.40535648],
+        ).all()
 
 
 @patch("eacy.load_instrument")
@@ -631,36 +662,45 @@ def test_coronagraph_yip_load_configuration_yippycoro_nrolls(
     mock_yippy_object_incl_nrolls,
     mock_instrument,
     mock_telescope,
-    capsys,
+    caplog,
 ):
-    mock_load_instrument.return_value = mock_instrument
-    mock_load_telescope.return_value = mock_telescope
-    mock_yippycoro.return_value = mock_yippy_object_incl_nrolls
+    with caplog.at_level(logging.DEBUG, logger="pyEDITH"):
+        mock_load_instrument.return_value = mock_instrument
+        mock_load_telescope.return_value = mock_telescope
+        mock_yippycoro.return_value = mock_yippy_object_incl_nrolls
 
-    coronagraph = CoronagraphYIP(path="test_path")
-    parameters = {
-        "observing_mode": "IFS",
-        "maximum_OWA": 90.0,
-        "bandwidth": 0.1,
-        "nchannels": 1,
-        "az_avg": True,
-    }
+        coronagraph = CoronagraphYIP(path="test_path")
+        parameters = {
+            "observing_mode": "IFS",
+            "maximum_OWA": 90.0,
+            "bandwidth": 0.1,
+            "nchannels": 1,
+            "az_avg": True,
+        }
 
-    mediator_ifs = MockMediator_IFS()
+        mediator_ifs = MockMediator_IFS()
 
-    coronagraph.load_configuration(parameters, mediator_ifs)
-    captured = capsys.readouterr()
-    assert (
-        "WARNING: Both psf_trunc_ratio and photometric_aperture_radius are specified. Preferring psf_trunc_ratio going forward..."
-        in captured.out
-    )
+        coronagraph.load_configuration(parameters, mediator_ifs)
 
-    # Check coronagraph_optical_throughput
-    assert len(coronagraph.coronagraph_optical_throughput) == 3
-    assert np.isclose(
-        coronagraph.coronagraph_optical_throughput.value,
-        [0.41891199, 0.43711322, 0.40535648],
-    ).all()
+        assert any(
+            "Both psf_trunc_ratio and photometric_aperture_radius are specified. Preferring psf_trunc_ratio going forward..."
+            in record.message
+            for record in caplog.records
+            if record.levelno == logging.WARNING
+        )
+
+        assert any(
+            "Using psf_trunc_ratio to calculate Omega..." in record.message
+            for record in caplog.records
+            if record.levelno == logging.INFO
+        )
+
+        # Check coronagraph_optical_throughput
+        assert len(coronagraph.coronagraph_optical_throughput) == 3
+        assert np.isclose(
+            coronagraph.coronagraph_optical_throughput.value,
+            [0.41891199, 0.43711322, 0.40535648],
+        ).all()
 
 
 @patch("eacy.load_instrument")
@@ -739,96 +779,112 @@ def test_coronagraph_yip_load_configuration_with_photometric_aperture_radius(
     mock_yippy_object,
     mock_instrument,
     mock_telescope,
-    capsys,
+    caplog,
 ):
-    mock_load_instrument.return_value = mock_instrument
-    mock_load_telescope.return_value = mock_telescope
-    mock_yippycoro.return_value = mock_yippy_object
+    with caplog.at_level(logging.DEBUG, logger="pyEDITH"):
+        mock_load_instrument.return_value = mock_instrument
+        mock_load_telescope.return_value = mock_telescope
+        mock_yippycoro.return_value = mock_yippy_object
 
-    coronagraph = CoronagraphYIP(path="test_path")
-    parameters = {
-        "observing_mode": "IMAGER",
-        "maximum_OWA": 90.0,
-        "bandwidth": 0.1,
-        "nrolls": 2,
-        "nchannels": 1,
-        "Tcore": 0.5 * DIMENSIONLESS,
-    }
+        coronagraph = CoronagraphYIP(path="test_path")
+        parameters = {
+            "observing_mode": "IMAGER",
+            "maximum_OWA": 90.0,
+            "bandwidth": 0.1,
+            "nrolls": 2,
+            "nchannels": 1,
+            "Tcore": 0.5 * DIMENSIONLESS,
+        }
 
-    mediator = MockMediatorWithPhotapRad()
+        mediator = MockMediatorWithPhotapRad()
 
-    coronagraph.load_configuration(parameters, mediator)
-    captured = capsys.readouterr()
-    assert "Using photometric_aperture_radius to calculate Omega..." in captured.out
-    assert "Using user-defined Tcore..." in captured.out
+        coronagraph.load_configuration(parameters, mediator)
+        assert any(
+            "Using photometric_aperture_radius to calculate Omega..." in record.message
+            for record in caplog.records
+            if record.levelno == logging.INFO
+        )
+        assert any(
+            "Using user-defined Tcore..." in record.message
+            for record in caplog.records
+            if record.levelno == logging.INFO
+        )
 
-    # Check that omega_lod and photometric_aperture_throughput are calculated correctly
-    assert coronagraph.omega_lod.shape == (coronagraph.npix, coronagraph.npix, 1)
-    assert np.all(coronagraph.omega_lod == np.pi * 0.7**2 * LAMBDA_D**2)
+        # Check that omega_lod and photometric_aperture_throughput are calculated correctly
+        assert coronagraph.omega_lod.shape == (coronagraph.npix, coronagraph.npix, 1)
+        assert np.all(coronagraph.omega_lod == np.pi * 0.7**2 * LAMBDA_D**2)
 
-    assert coronagraph.photometric_aperture_throughput.shape == (
-        coronagraph.npix,
-        coronagraph.npix,
-        1,
-    )
-    assert np.all(
-        (coronagraph.photometric_aperture_throughput == 0.5 * DIMENSIONLESS)
-        | (coronagraph.photometric_aperture_throughput == 0.0 * DIMENSIONLESS)
-    )
-    assert np.all(
-        coronagraph.photometric_aperture_throughput[
-            coronagraph.r < coronagraph.minimum_IWA
-        ]
-        == 0.0 * DIMENSIONLESS
-    )
-    assert np.all(
-        coronagraph.photometric_aperture_throughput[
-            coronagraph.r > coronagraph.maximum_OWA
-        ]
-        == 0.0 * DIMENSIONLESS
-    )
+        assert coronagraph.photometric_aperture_throughput.shape == (
+            coronagraph.npix,
+            coronagraph.npix,
+            1,
+        )
+        assert np.all(
+            (coronagraph.photometric_aperture_throughput == 0.5 * DIMENSIONLESS)
+            | (coronagraph.photometric_aperture_throughput == 0.0 * DIMENSIONLESS)
+        )
+        assert np.all(
+            coronagraph.photometric_aperture_throughput[
+                coronagraph.r < coronagraph.minimum_IWA
+            ]
+            == 0.0 * DIMENSIONLESS
+        )
+        assert np.all(
+            coronagraph.photometric_aperture_throughput[
+                coronagraph.r > coronagraph.maximum_OWA
+            ]
+            == 0.0 * DIMENSIONLESS
+        )
 
-    # SAME TEST but no Tcore available, use default
-    coronagraph = CoronagraphYIP(path="test_path")
-    parameters = {
-        "observing_mode": "IMAGER",
-        "maximum_OWA": 90.0,
-        "bandwidth": 0.1,
-        "nrolls": 2,
-        "nchannels": 1,
-    }
-    mediator = MockMediatorWithPhotapRad()
+        caplog.clear()
+        # SAME TEST but no Tcore available, use default
+        coronagraph = CoronagraphYIP(path="test_path")
+        parameters = {
+            "observing_mode": "IMAGER",
+            "maximum_OWA": 90.0,
+            "bandwidth": 0.1,
+            "nrolls": 2,
+            "nchannels": 1,
+        }
+        mediator = MockMediatorWithPhotapRad()
 
-    coronagraph.load_configuration(parameters, mediator)
-    captured = capsys.readouterr()
-    assert "Using photometric_aperture_radius to calculate Omega..." in captured.out
-    assert "Using default Tcore..." in captured.out
+        coronagraph.load_configuration(parameters, mediator)
+        assert any(
+            "Using photometric_aperture_radius to calculate Omega..." in record.message
+            for record in caplog.records
+            if record.levelno == logging.INFO
+        )
+        assert any(
+            "Using default Tcore..." in record.message
+            for record in caplog.records
+            if record.levelno == logging.INFO
+        )
 
-    # Check that omega_lod and photometric_aperture_throughput are calculated correctly
-    assert coronagraph.omega_lod.shape == (coronagraph.npix, coronagraph.npix, 1)
-    assert np.all(coronagraph.omega_lod == np.pi * 0.7**2 * LAMBDA_D**2)
+        # Check that omega_lod and photometric_aperture_throughput are calculated correctly
+        assert coronagraph.omega_lod.shape == (coronagraph.npix, coronagraph.npix, 1)
+        assert np.all(coronagraph.omega_lod == np.pi * 0.7**2 * LAMBDA_D**2)
 
-    assert coronagraph.photometric_aperture_throughput.shape == (
-        coronagraph.npix,
-        coronagraph.npix,
-        1,
-    )
-    assert np.all(
-        (coronagraph.photometric_aperture_throughput == 0.2968371 * DIMENSIONLESS)
-        | (coronagraph.photometric_aperture_throughput == 0.0 * DIMENSIONLESS)
-    )
-    assert np.all(
-        coronagraph.photometric_aperture_throughput[
-            coronagraph.r < coronagraph.minimum_IWA
-        ]
-        == 0.0 * DIMENSIONLESS
-    )
-    assert np.all(
-        coronagraph.photometric_aperture_throughput[
-            coronagraph.r > coronagraph.maximum_OWA
-        ]
-        == 0.0 * DIMENSIONLESS
-    )
+        assert coronagraph.photometric_aperture_throughput.shape == (
+            coronagraph.npix,
+            coronagraph.npix,
+            1,
+        )
+        assert np.all(
+            (coronagraph.photometric_aperture_throughput == 0.2968371 * DIMENSIONLESS)
+            | (coronagraph.photometric_aperture_throughput == 0.0 * DIMENSIONLESS)
+        )
+        assert np.all(
+            coronagraph.photometric_aperture_throughput[
+                coronagraph.r < coronagraph.minimum_IWA
+            ]
+            == 0.0 * DIMENSIONLESS
+        )
+        assert np.all(
+            coronagraph.photometric_aperture_throughput[
+                coronagraph.r > coronagraph.maximum_OWA
+            ]
+            == 0.0 * DIMENSIONLESS
+        )
 
 
 @patch("eacy.load_instrument")
@@ -841,27 +897,32 @@ def test_coronagraph_yip_load_configuration_high_psf_trunc_ratio(
     mock_yippy_object,
     mock_instrument,
     mock_telescope,
-    capsys,
+    caplog,
 ):
-    mock_load_instrument.return_value = mock_instrument
-    mock_load_telescope.return_value = mock_telescope
-    mock_yippycoro.return_value = mock_yippy_object
+    with caplog.at_level(logging.DEBUG, logger="pyEDITH"):
+        mock_load_instrument.return_value = mock_instrument
+        mock_load_telescope.return_value = mock_telescope
+        mock_yippycoro.return_value = mock_yippy_object
 
-    coronagraph = CoronagraphYIP(path="test_path")
-    parameters = {
-        "observing_mode": "IMAGER",
-        "maximum_OWA": 90.0,
-        "bandwidth": 0.1,
-        "nrolls": 2,
-        "nchannels": 1,
-        "Tcore": 0.5 * DIMENSIONLESS,
-    }
+        coronagraph = CoronagraphYIP(path="test_path")
+        parameters = {
+            "observing_mode": "IMAGER",
+            "maximum_OWA": 90.0,
+            "bandwidth": 0.1,
+            "nrolls": 2,
+            "nchannels": 1,
+            "Tcore": 0.5 * DIMENSIONLESS,
+        }
 
-    mediator = MockMediatorWithHighPSFTruncRatio()
+        mediator = MockMediatorWithHighPSFTruncRatio()
 
-    coronagraph.load_configuration(parameters, mediator)
-    captured = capsys.readouterr()
-    assert coronagraph.omega_lod.shape == (coronagraph.npix, coronagraph.npix, 1)
-    assert coronagraph.omega_lod.unit == LAMBDA_D**2
-    # 0.0025 matches the old internally-computed value for this pixscale
-    assert np.allclose(coronagraph.omega_lod.value, 0.0025, rtol=1e-6, atol=1e-9)
+        coronagraph.load_configuration(parameters, mediator)
+        assert any(
+            "Using psf_trunc_ratio to calculate Omega..." in record.message
+            for record in caplog.records
+            if record.levelno == logging.INFO
+        )
+        assert coronagraph.omega_lod.shape == (coronagraph.npix, coronagraph.npix, 1)
+        assert coronagraph.omega_lod.unit == LAMBDA_D**2
+        # 0.0025 matches the old internally-computed value for this pixscale
+        assert np.allclose(coronagraph.omega_lod.value, 0.0025, rtol=1e-6, atol=1e-9)

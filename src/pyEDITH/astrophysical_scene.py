@@ -5,7 +5,9 @@ import astropy.constants as const
 from .units import *
 from . import utils
 from astropy.coordinates import SkyCoord
+import logging
 
+logger = logging.getLogger("pyEDITH")
 # def calc_flux_zero_point_synphot(lam: u.Quantity):
 
 #     # calculates a zeropoint Vega spectrum using boxcar filters
@@ -57,7 +59,6 @@ def calc_flux_zero_point(
     output_unit: str = "pcgs",
     perlambd: bool = False,
     AB: bool = False,
-    verbose: bool = False,
 ) -> u.Quantity:
     """
     Calculate the flux zero point for given wavelengths.
@@ -82,9 +83,6 @@ def calc_flux_zero_point(
     AB : bool, optional
         If True, use AB magnitude system instead of Johnson.
         Default is False.
-    verbose : bool, optional
-        If True, print additional information.
-        Default is False.
 
     Returns
     -------
@@ -108,7 +106,7 @@ def calc_flux_zero_point(
         raise ValueError("Cannot set Jy and perlambd")
 
     # Ensure lambd is in the correct units (cm for CGS)
-    lambd = lambd.to(u.cm)
+    lambd = lambd.to(CM)
 
     # Convert constants to CGS
     h_cgs = const.h.cgs.value
@@ -117,18 +115,18 @@ def calc_flux_zero_point(
     # Calculate the zero point
     if AB:
         # AB magnitude system
-        f0 = 3631 * u.Jy  # AB zero point
+        f0 = 3631 * JANSKY  # AB zero point
     else:
         # Johnson magnitude system
         known_lambd = (
             np.array(
                 [0.36, 0.44, 0.55, 0.71, 0.97, 1.25, 1.60, 2.22, 3.54, 4.80, 10.6, 21.0]
             )
-            * u.um
+            * WAVELENGTH
         )
         known_zeropoint_jy = (
             np.array([1823, 4130, 3781, 2941, 2635, 1603, 1075, 667, 288, 170, 36, 9.4])
-            * u.Jy
+            * JANSKY
         )
 
         # Interpolation in log-log space
@@ -138,8 +136,8 @@ def calc_flux_zero_point(
             kind="cubic",
             fill_value="extrapolate",
         )
-        logf0 = interp(np.log10(lambd.to(u.um).value))
-        f0 = 10.0**logf0 * u.Jy
+        logf0 = interp(np.log10(lambd.to_value(WAVELENGTH)))
+        f0 = 10.0**logf0 * JANSKY
 
     # Convert to desired output units
     if output_unit == "cgs":
@@ -148,21 +146,24 @@ def calc_flux_zero_point(
     elif output_unit == "pcgs":
         # Convert to photons / (s * cm^2 * Hz)
         f0 = f0.to(
-            PHOTON_COUNT / (u.cm**2 * u.s * u.Hz),
+            PHOTON_FLUX_DENSITY_HZ,
             equivalencies=u.spectral_density(lambd),
         )
 
     # Convert to per wavelength if requested
     if perlambd:
         if output_unit == "cgs":
-            f0 = f0.to(u.erg / (u.s * u.cm**3), equivalencies=u.spectral_density(lambd))
+            f0 = f0.to(
+                SPECTRAL_FLUX_DENSITY_CGS_WAVELENGTH,
+                equivalencies=u.spectral_density(lambd),
+            )
         elif output_unit == "pcgs":
             f0 = f0.to(
-                PHOTON_COUNT / (u.s * u.cm**3), equivalencies=u.spectral_density(lambd)
+                PHOTON_FLUX_DENSITY_CGS_WAVELENGTH,
+                equivalencies=u.spectral_density(lambd),
             )
 
-    if verbose:
-        print(f"Flux zero point calculated at {lambd} in units of {f0.unit}")
+    logger.info(f"Flux zero point calculated at {lambd} in units of {f0.unit}")
 
     return f0
 
@@ -312,7 +313,7 @@ def calc_zodi_flux(
 
     # SOURCE: Leinert et al. (1998)
     # Define solar longitude and beta values for interpolation
-    beta_vector = np.array([0.0, 5, 10, 15, 20, 25, 30, 45, 60, 75]) * u.deg
+    beta_vector = np.array([0.0, 5, 10, 15, 20, 25, 30, 45, 60, 75]) * DEG
     sollong_vector = (
         np.array(
             [
@@ -337,7 +338,7 @@ def calc_zodi_flux(
                 180.0,
             ]
         )
-        * u.deg
+        * DEG
     )
 
     # Table 17 values (assumed to be in some brightness units)
@@ -368,8 +369,8 @@ def calc_zodi_flux(
         * SPECTRAL_RADIANCE
     )
     # For coronagraph, assume observations near solar longitude of 135 degrees
-    j = np.argmin(np.abs(sollong_vector - 135 * u.deg))
-    k = np.argmin(np.abs(sollong_vector - 90 * u.deg))
+    j = np.argmin(np.abs(sollong_vector - 135 * DEG))
+    k = np.argmin(np.abs(sollong_vector - 90 * DEG))
 
     # Interpolate to get zodi brightness factor
     from scipy.interpolate import interp1d
@@ -437,7 +438,7 @@ def calc_zodi_flux(
     interp = interp1d(
         np.log10(zodi_lambd.value), np.log10(zodi_blambd.value), kind="cubic"
     )
-    blambd = 10 ** interp(np.log10(lambd.to(u.um).value)) * zodi_blambd.unit
+    blambd = 10 ** interp(np.log10(lambd.to_value(WAVELENGTH))) * zodi_blambd.unit
 
     # Convert to photon flux
     # I90fabsfco = blambd / (u.h * u.c / lambd)
@@ -604,8 +605,8 @@ class AstrophysicalScene:
                 "FstarV_10pc" not in parameters
                 and parameters["observing_mode"] == "IFS"
             ):
-                print(
-                    "WARNING: `FstarV_10pc` not specified in parameters. Calculating internally..."
+                logger.warning(
+                    "`FstarV_10pc` not specified in parameters. Calculating internally..."
                 )
                 # from synphot import SourceSpectrum, SpectralElement, Observation
                 # from synphot.models import Empirical1D
@@ -641,7 +642,7 @@ class AstrophysicalScene:
 
             self.Fp_over_Fs = parameters["Fp/Fs"] * DIMENSIONLESS
             # Convert to relative fluxes (used internally)
-            self.Fs_over_F0 = (Fstar_absolute / self.F0).to(u.dimensionless_unscaled)
+            self.Fs_over_F0 = (Fstar_absolute / self.F0).to(DIMENSIONLESS)
 
             # Calculate vmag (needed for zodi)
             self.vmag = -2.5 * np.log10(Fstar_V_absolute / self.F0V) * MAGNITUDE
@@ -725,8 +726,8 @@ class AstrophysicalScene:
                 ), "length of ez_PPF does not match length of Fp_over_Fs"
                 self.ez_PPF = np.array(parameters["ez_PPF"])
         else:
-            print(
-                "WARNING: ez_PPF not set. Assuming EZ subtraction to Poisson limit (ez_PPF = inf)"
+            logger.warning(
+                "ez_PPF not set. Assuming EZ subtraction to Poisson limit (ez_PPF = inf)"
             )
             self.ez_PPF = np.inf * np.ones_like(self.Fp_over_Fs)
 
@@ -805,7 +806,7 @@ class AstrophysicalScene:
     def regrid_spectra(self, parameters, observation):
         """function to re-grid onto a new wavelength grid if the user specified this option"""
         # spectra to regrid: F0, Fzodi_list, Fexozodi_list, Fbinary_list, Fp_over_Fs, Fs_over_F0
-        print("Re-gridding spectra onto ETC wavelength grid...")
+        logger.info("Re-gridding spectra onto ETC wavelength grid...")
         self.F0 = utils.regrid_spec_gaussconv(
             parameters["wavelength"],
             self.F0,

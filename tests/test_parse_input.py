@@ -199,244 +199,262 @@ def test_parse_input_file(sample_input_file, sample_input_file_error):
     os.unlink(non_numeric.name)
 
 
-def test_parse_parameters(capsys):
-    # Test basic functionality with multiple parameters
-    parameters = {
-        "wavelength": [0.5, 0.6, 0.7],
-        "distance": 10,
-        "magV": 5.0,
-        "nzodis": 3.0,
-        "observing_mode": "IFS",
-        "snr": [10, 20, 30],
-        "T_optical": 0.8,
-        "diameter": 2.4,
-        "toverhead_fixed": 300,
-        "contrast": 1e-10,
-        "nrolls": 3,
-        "observatory_preset": "EAC1",
-    }
-    parsed = parse_parameters(parameters)
-
-    assert np.all(parsed["wavelength"] == np.array([0.5, 0.6, 0.7]))
-    assert parsed["distance"] == 10
-    assert parsed["magV"] == 5.0
-    assert parsed["nzodis"] == 3.0
-    assert parsed["observing_mode"] == "IFS"
-    assert parsed["nlambda"] == 3
-    assert np.all(parsed["snr"] == np.array([10, 20, 30]))
-    assert np.all(parsed["T_optical"] == np.array([0.8, 0.8, 0.8]))
-    assert parsed["diameter"] == 2.4
-    assert parsed["toverhead_fixed"] == 300
-    assert parsed["contrast"] == 1e-10
-    assert parsed["nrolls"] == 3
-    assert parsed["observatory_preset"] == "EAC1"
-
-    # Wavelength tests
-    # Test wavelength as a scalar
-    parsed = parse_parameters({"wavelength": 0.5})
-    assert parsed["wavelength"] == np.array([0.5])
-    assert isinstance(parsed["wavelength"], np.ndarray)
-
-    # Test wavelength as a list
-    parsed = parse_parameters({"wavelength": [0.5, 0.6, 0.7]})
-    assert np.all(parsed["wavelength"] == np.array([0.5, 0.6, 0.7]))
-    assert isinstance(parsed["wavelength"], np.ndarray)
-
-    # Test wavelength as a scalar quantity
-    parsed = parse_parameters({"wavelength": 0.5 * u.um})
-    assert parsed["wavelength"] == [0.5] * u.um
-    assert isinstance(parsed["wavelength"], u.Quantity)
-
-    # Test wavelength as a list quantity
-    parsed = parse_parameters({"wavelength": [0.5, 0.6, 0.7] * u.um})
-    assert np.all(parsed["wavelength"] == [0.5, 0.6, 0.7] * u.um)
-    assert isinstance(parsed["wavelength"], u.Quantity)
-
-    # Test Case 1: default_len > 1 but value is a pure scalar
-    parse_parameters({"wavelength": [0.5, 0.6, 0.7], "snr": 10})
-    captured = capsys.readouterr()
-    assert (
-        "WARNING: snr should be a list of length 3. pyEDITH will create one assuming the input value for all the elements of the list."
-        in captured.out
-    )
-    parsed = parse_parameters({"wavelength": [0.5, 0.6, 0.7], "snr": 10})
-    assert np.all(parsed["snr"] == np.array([10, 10, 10]))
-
-    # Test Case 1a: default_len > 1 but value is a Quantity scalar
-    parse_parameters(
-        {"wavelength": [0.5, 0.6, 0.7], "snr": 10 * u.dimensionless_unscaled}
-    )
-    captured = capsys.readouterr()
-    assert (
-        "WARNING: snr should be a list of length 3. pyEDITH will create one assuming the input value for all the elements of the list."
-        in captured.out
-    )
-    parsed = parse_parameters(
-        {"wavelength": [0.5, 0.6, 0.7], "snr": 10 * u.dimensionless_unscaled}
-    )
-    assert np.all(parsed["snr"] == np.array([10, 10, 10]) * u.dimensionless_unscaled)
-
-    # Test Case 2: default_len > 1 but value has a length > 1 and != default_len
-    with pytest.raises(
-        ValueError,
-        match="snr should be a list of length 3, but it has length 2.",
-    ):
-        parse_parameters({"wavelength": [0.5, 0.6, 0.7], "snr": [10, 20]})
-
-    # Test Case 3: default_len == 1, return a single element array
-    parsed = parse_parameters({"wavelength": 0.5, "snr": [10, 20, 30]})
-    captured = capsys.readouterr()
-    assert (
-        "WARNING: snr should be a list of length 1 but you assigned multiple values. pyEDITH will create a list assuming only the first input value."
-        in captured.out
-    )
-    assert np.all(parsed["snr"] == np.array([10]))
-
-    # Test with Quantity input
-    parsed = parse_parameters(
-        {
-            "wavelength": [0.5, 0.6, 0.7] * u.um,
-            "snr": [10, 20, 30] * u.dimensionless_unscaled,
+def test_parse_parameters(caplog):
+    with caplog.at_level(logging.DEBUG, logger="pyEDITH"):
+        # Test basic functionality with multiple parameters
+        parameters = {
+            "wavelength": [0.5, 0.6, 0.7],
+            "distance": 10,
+            "magV": 5.0,
+            "nzodis": 3.0,
+            "observing_mode": "IFS",
+            "snr": [10, 20, 30],
+            "T_optical": 0.8,
+            "diameter": 2.4,
+            "toverhead_fixed": 300,
+            "contrast": 1e-10,
+            "nrolls": 3,
+            "observatory_preset": "EAC1",
         }
-    )
-    assert np.all(parsed["wavelength"] == np.array([0.5, 0.6, 0.7]) * u.um)
-    assert np.all(parsed["snr"] == np.array([10, 20, 30]) * u.dimensionless_unscaled)
+        parsed = parse_parameters(parameters)
 
-    # Test Case 3: default_len == 1, return a single element array with quantity input
-    parsed = parse_parameters(
-        {"wavelength": 0.5, "snr": [10, 20, 30] * u.dimensionless_unscaled}
-    )
-    captured = capsys.readouterr()
-    assert (
-        "WARNING: snr should be a list of length 1 but you assigned multiple values. pyEDITH will create a list assuming only the first input value."
-        in captured.out
-    )
-    assert np.all(parsed["snr"] == u.Quantity([10], u.dimensionless_unscaled))
+        assert np.all(parsed["wavelength"] == np.array([0.5, 0.6, 0.7]))
+        assert parsed["distance"] == 10
+        assert parsed["magV"] == 5.0
+        assert parsed["nzodis"] == 3.0
+        assert parsed["observing_mode"] == "IFS"
+        assert parsed["nlambda"] == 3
+        assert np.all(parsed["snr"] == np.array([10, 20, 30]))
+        assert np.all(parsed["T_optical"] == np.array([0.8, 0.8, 0.8]))
+        assert parsed["diameter"] == 2.4
+        assert parsed["toverhead_fixed"] == 300
+        assert parsed["contrast"] == 1e-10
+        assert parsed["nrolls"] == 3
+        assert parsed["observatory_preset"] == "EAC1"
 
-    # Test when wavelength is not provided but nlambda is
-    parsed = parse_parameters({"snr": 10}, nlambda=3)
-    assert parsed["nlambda"] == 3
-    assert np.all(parsed["snr"] == np.array([10, 10, 10]))
+        # Wavelength tests
+        # Test wavelength as a scalar
+        parsed = parse_parameters({"wavelength": 0.5})
+        assert parsed["wavelength"] == np.array([0.5])
+        assert isinstance(parsed["wavelength"], np.ndarray)
 
-    # Test when both wavelength and nlambda are not provided
-    with pytest.raises(
-        ValueError,
-        match="pyEDITH does not have access to wavelength here, you should provide nlambda as an argument to this function.",
-    ):
-        parse_parameters({"snr": 10})
+        # Test wavelength as a list
+        parsed = parse_parameters({"wavelength": [0.5, 0.6, 0.7]})
+        assert np.all(parsed["wavelength"] == np.array([0.5, 0.6, 0.7]))
+        assert isinstance(parsed["wavelength"], np.ndarray)
 
-    # Test wavelength parameters
-    wavelength_params = [
-        "snr",
-        "T_optical",
-        "epswarmTrcold",
-        "npix_multiplier",
-        "DC",
-        "RN",
-        "tread",
-        "CIC",
-        "QE",
-        "dQE",
-        "IFS_eff",
-        "mag",
-        "Fstar_10pc",
-        "Fp/Fs",
-        "delta_mag",
-        "F0",
-        "det_npix_input",
-    ]
+        # Test wavelength as a scalar quantity
+        parsed = parse_parameters({"wavelength": 0.5 * u.um})
+        assert parsed["wavelength"] == [0.5] * u.um
+        assert isinstance(parsed["wavelength"], u.Quantity)
 
-    # Test with single wavelength
-    for param in wavelength_params:
-        parsed = parse_parameters({"wavelength": 0.5, param: 1.5})
-        assert np.all(parsed[param] == np.array([1.5]))
-        assert isinstance(parsed[param], np.ndarray)
+        # Test wavelength as a list quantity
+        parsed = parse_parameters({"wavelength": [0.5, 0.6, 0.7] * u.um})
+        assert np.all(parsed["wavelength"] == [0.5, 0.6, 0.7] * u.um)
+        assert isinstance(parsed["wavelength"], u.Quantity)
 
-    # Test with multiple wavelengths
-    wavelengths = [0.5, 0.6, 0.7]
-    for param in wavelength_params:
-        parsed = parse_parameters({"wavelength": wavelengths, param: [1.5, 2.5, 3.5]})
-        assert np.all(parsed[param] == np.array([1.5, 2.5, 3.5]))
-        assert isinstance(parsed[param], np.ndarray)
+        # Test Case 1: default_len > 1 but value is a pure scalar
+        parse_parameters({"wavelength": [0.5, 0.6, 0.7], "snr": 10})
+        assert any(
+            "snr should be a list of length 3. pyEDITH will create one assuming the input value for all the elements of the list."
+            in record.message
+            for record in caplog.records
+            if record.levelno == logging.WARNING
+        )
 
-    # Test with scalar input for multiple wavelengths
-    for param in wavelength_params:
-        parsed = parse_parameters({"wavelength": wavelengths, param: 1.5})
-        assert np.all(parsed[param] == np.array([1.5, 1.5, 1.5]))
-        assert isinstance(parsed[param], np.ndarray)
+        caplog.clear()
+        parsed = parse_parameters({"wavelength": [0.5, 0.6, 0.7], "snr": 10})
+        assert np.all(parsed["snr"] == np.array([10, 10, 10]))
 
-    # Test with Quantity input
-    for param in wavelength_params:
-        parsed = parse_parameters({"wavelength": wavelengths, param: 1.5 * u.m})
-        assert np.all(parsed[param] == np.array([1.5, 1.5, 1.5]) * u.m)
-        assert isinstance(parsed[param], u.Quantity)
+        # Test Case 1a: default_len > 1 but value is a Quantity scalar
+        parse_parameters(
+            {"wavelength": [0.5, 0.6, 0.7], "snr": 10 * u.dimensionless_unscaled}
+        )
+        assert any(
+            "snr should be a list of length 3. pyEDITH will create one assuming the input value for all the elements of the list."
+            in record.message
+            for record in caplog.records
+            if record.levelno == logging.WARNING
+        )
 
-    # Test with mismatched lengths
-    with pytest.raises(ValueError):
-        parse_parameters({"wavelength": wavelengths, "snr": [1.5, 2.5]})
+        parsed = parse_parameters(
+            {"wavelength": [0.5, 0.6, 0.7], "snr": 10 * u.dimensionless_unscaled}
+        )
+        assert np.all(
+            parsed["snr"] == np.array([10, 10, 10]) * u.dimensionless_unscaled
+        )
 
-    # Test with nlambda provided instead of wavelength
-    parsed = parse_parameters({"snr": 1.5}, nlambda=3)
-    assert np.all(parsed["snr"] == np.array([1.5, 1.5, 1.5]))
-    assert isinstance(parsed["snr"], np.ndarray)
-    target_params = [
-        "distance",
-        "magV",
-        "FstarV_10pc",
-        "stellar_radius",
-        "nzodis",
-        "ra",
-        "dec",
-        "delta_mag_min",
-        "Fp_min/Fs",
-        "separation",
-    ]
-    for param in target_params:
-        parsed = parse_parameters({"wavelength": 0.5, param: 1.5})
-        assert parsed[param] == 1.5
-        assert isinstance(parsed[param], float)
+        # Test Case 2: default_len > 1 but value has a length > 1 and != default_len
+        with pytest.raises(
+            ValueError,
+            match="snr should be a list of length 3, but it has length 2.",
+        ):
+            parse_parameters({"wavelength": [0.5, 0.6, 0.7], "snr": [10, 20]})
 
-    # Test scalar parameters
-    scalar_params = [
-        "photometric_aperture_radius",
-        "psf_trunc_ratio",
-        "diameter",
-        "toverhead_fixed",
-        "toverhead_multi",
-        "minimum_IWA",
-        "maximum_OWA",
-        "contrast",
-        "noisefloor_factor",
-        "bandwidth",
-        "Tcore",
-        "TLyot",
-        "temperature",
-        "T_contamination",
-        "CRb_multiplier",
-        "t_photon_count_input",
-    ]
-    for param in scalar_params:
-        parsed = parse_parameters({"wavelength": 0.5, param: 1.5})
-        assert parsed[param] == 1.5
-        assert isinstance(parsed[param], float)
+        # Test Case 3: default_len == 1, return a single element array
+        caplog.clear()
+        parsed = parse_parameters({"wavelength": 0.5, "snr": [10, 20, 30]})
+        print(caplog.records)
+        assert any(
+            "snr should be a list of length 1 but you assigned multiple values. pyEDITH will create a list assuming only the first input value."
+            in record.message
+            for record in caplog.records
+            if record.levelno == logging.WARNING
+        )
 
-    # Test integer parameters
-    parsed = parse_parameters({"wavelength": 0.5, "nrolls": 3})
-    assert parsed["nrolls"] == 3
-    assert isinstance(parsed["nrolls"], int)
+        # Test with Quantity input
+        parsed = parse_parameters(
+            {
+                "wavelength": [0.5, 0.6, 0.7] * u.um,
+                "snr": [10, 20, 30] * u.dimensionless_unscaled,
+            }
+        )
+        assert np.all(parsed["wavelength"] == np.array([0.5, 0.6, 0.7]) * u.um)
+        assert np.all(
+            parsed["snr"] == np.array([10, 20, 30]) * u.dimensionless_unscaled
+        )
 
-    # Test observatory specs
-    observatory_specs = [
-        "observatory_preset",
-        "telescope_type",
-        "coronagraph_type",
-        "detector_type",
-        "observing_mode",
-    ]
-    for spec in observatory_specs:
-        parsed = parse_parameters({"wavelength": 0.5, spec: "TestSpec"})
-        assert parsed[spec] == "TestSpec"
-        assert isinstance(parsed[spec], str)
+        # Test Case 3: default_len == 1, return a single element array with quantity input
+        caplog.clear()
+        parsed = parse_parameters(
+            {"wavelength": 0.5, "snr": [10, 20, 30] * u.dimensionless_unscaled}
+        )
+        print(caplog.records)
+        assert any(
+            "snr should be a list of length 1 but you assigned multiple values. pyEDITH will create a list assuming only the first input value."
+            in record.message
+            for record in caplog.records
+            if record.levelno == logging.WARNING
+        )
+
+        assert np.all(parsed["snr"] == u.Quantity([10], u.dimensionless_unscaled))
+
+        # Test when wavelength is not provided but nlambda is
+        parsed = parse_parameters({"snr": 10}, nlambda=3)
+        assert parsed["nlambda"] == 3
+        assert np.all(parsed["snr"] == np.array([10, 10, 10]))
+
+        # Test when both wavelength and nlambda are not provided
+        with pytest.raises(
+            ValueError,
+            match="pyEDITH does not have access to wavelength here, you should provide nlambda as an argument to this function.",
+        ):
+            parse_parameters({"snr": 10})
+
+        # Test wavelength parameters
+        wavelength_params = [
+            "snr",
+            "T_optical",
+            "epswarmTrcold",
+            "npix_multiplier",
+            "DC",
+            "RN",
+            "tread",
+            "CIC",
+            "QE",
+            "dQE",
+            "IFS_eff",
+            "mag",
+            "Fstar_10pc",
+            "Fp/Fs",
+            "delta_mag",
+            "F0",
+            "det_npix_input",
+        ]
+
+        # Test with single wavelength
+        for param in wavelength_params:
+            parsed = parse_parameters({"wavelength": 0.5, param: 1.5})
+            assert np.all(parsed[param] == np.array([1.5]))
+            assert isinstance(parsed[param], np.ndarray)
+
+        # Test with multiple wavelengths
+        wavelengths = [0.5, 0.6, 0.7]
+        for param in wavelength_params:
+            parsed = parse_parameters(
+                {"wavelength": wavelengths, param: [1.5, 2.5, 3.5]}
+            )
+            assert np.all(parsed[param] == np.array([1.5, 2.5, 3.5]))
+            assert isinstance(parsed[param], np.ndarray)
+
+        # Test with scalar input for multiple wavelengths
+        for param in wavelength_params:
+            parsed = parse_parameters({"wavelength": wavelengths, param: 1.5})
+            assert np.all(parsed[param] == np.array([1.5, 1.5, 1.5]))
+            assert isinstance(parsed[param], np.ndarray)
+
+        # Test with Quantity input
+        for param in wavelength_params:
+            parsed = parse_parameters({"wavelength": wavelengths, param: 1.5 * u.m})
+            assert np.all(parsed[param] == np.array([1.5, 1.5, 1.5]) * u.m)
+            assert isinstance(parsed[param], u.Quantity)
+
+        # Test with mismatched lengths
+        with pytest.raises(ValueError):
+            parse_parameters({"wavelength": wavelengths, "snr": [1.5, 2.5]})
+
+        # Test with nlambda provided instead of wavelength
+        parsed = parse_parameters({"snr": 1.5}, nlambda=3)
+        assert np.all(parsed["snr"] == np.array([1.5, 1.5, 1.5]))
+        assert isinstance(parsed["snr"], np.ndarray)
+        target_params = [
+            "distance",
+            "magV",
+            "FstarV_10pc",
+            "stellar_radius",
+            "nzodis",
+            "ra",
+            "dec",
+            "delta_mag_min",
+            "Fp_min/Fs",
+            "separation",
+        ]
+        for param in target_params:
+            parsed = parse_parameters({"wavelength": 0.5, param: 1.5})
+            assert parsed[param] == 1.5
+            assert isinstance(parsed[param], float)
+
+        # Test scalar parameters
+        scalar_params = [
+            "photometric_aperture_radius",
+            "psf_trunc_ratio",
+            "diameter",
+            "toverhead_fixed",
+            "toverhead_multi",
+            "minimum_IWA",
+            "maximum_OWA",
+            "contrast",
+            "noisefloor_factor",
+            "bandwidth",
+            "Tcore",
+            "TLyot",
+            "temperature",
+            "T_contamination",
+            "CRb_multiplier",
+            "t_photon_count_input",
+        ]
+        for param in scalar_params:
+            parsed = parse_parameters({"wavelength": 0.5, param: 1.5})
+            assert parsed[param] == 1.5
+            assert isinstance(parsed[param], float)
+
+        # Test integer parameters
+        parsed = parse_parameters({"wavelength": 0.5, "nrolls": 3})
+        assert parsed["nrolls"] == 3
+        assert isinstance(parsed["nrolls"], int)
+
+        # Test observatory specs
+        observatory_specs = [
+            "observatory_preset",
+            "telescope_type",
+            "coronagraph_type",
+            "detector_type",
+            "observing_mode",
+        ]
+        for spec in observatory_specs:
+            parsed = parse_parameters({"wavelength": 0.5, spec: "TestSpec"})
+            assert parsed[spec] == "TestSpec"
+            assert isinstance(parsed[spec], str)
 
 
 def test_read_configuration(sample_input_file):

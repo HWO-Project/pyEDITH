@@ -2,6 +2,10 @@ from scipy.interpolate import interp1d
 import numpy as np
 import astropy.units as u
 from typing import Dict, Any
+import logging
+from .units import *
+
+logger = logging.getLogger("pyEDITH")
 
 
 def average_over_bandpass(params: dict, wavelength_range: list) -> dict:
@@ -244,7 +248,7 @@ def print_array_info(
 
         # Handle units
         if hasattr(arr, "unit"):
-            if arr.unit == u.dimensionless_unscaled:
+            if arr.unit == DIMENSIONLESS:
                 file.write(" Unit: dimensionless\n")
             else:
                 file.write(f" Unit: {arr.unit}\n")
@@ -261,7 +265,10 @@ def print_array_info(
             if np.issubdtype(arr.dtype, np.integer):
                 file.write(f" Value: {arr.item():d}\n")
             else:
-                file.write(f" Value: {arr.item():.6e}\n")
+                if arr.item() is None:
+                    file.write("Value: None\n")
+                else:
+                    file.write(f"Value: {arr.item():.6e}\n")
         else:
             file.write(f" Shape: {arr.shape}\n")
             if arr.size > 0:
@@ -290,8 +297,10 @@ def print_array_info(
             if has_units:
                 file.write(f"value: {arr.value.item():.6e}\n")
             else:
-
-                file.write(f"value: {arr.item():.6e}\n")
+                if arr.item() is None:
+                    file.write("value: None\n")
+                else:
+                    file.write(f"value: {arr.item():.6e}\n")
         else:
             max_val = np.max(arr)
             min_val = np.min(arr)
@@ -432,6 +441,9 @@ def print_all_variables(
     CRb : np.ndarray
         Total background count rate
     """
+    logger.debug(
+        "Printing all relevant variables in pyedith_validation.txt and pyedith_full_info.txt."
+    )
 
     for mode in ["validation", "full_info"]:
         with open("pyedith_" + mode + ".txt", "w") as file:

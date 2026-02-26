@@ -4,17 +4,23 @@ import numpy as np
 
 # Basic units
 LENGTH = u.m
+CM = u.cm
+NM = u.nm
 TIME = u.s
 TEMPERATURE = u.K
 ANGLE = u.rad
+RADIAN = u.radian
 WAVELENGTH = u.um
 FREQUENCY = u.Hz
 ENERGY = u.J
 POWER = u.W
 PHOTON_COUNT = u.photon
+AREA = u.cm**2
+JANSKY = u.Jy
 
 # Astronomical units
 DISTANCE = u.pc
+AU = u.au
 LUMINOSITY = u.L_sun
 REARTH = u.R_earth
 MAGNITUDE = u.mag
@@ -46,11 +52,18 @@ ZODI = u.def_unit(
 # Spectral units
 SPECTRAL_FLUX_DENSITY_CGS = u.erg / (u.cm**2 * u.s * u.Hz)
 PHOTON_FLUX_DENSITY = PHOTON_COUNT / (u.cm**2 * u.s * u.nm)
+PHOTON_FLUX_DENSITY_HZ = PHOTON_COUNT / (u.cm**2 * u.s * u.Hz)
+SPECTRAL_FLUX_DENSITY_CGS_WAVELENGTH = u.erg / (u.s * u.cm**3)
+PHOTON_FLUX_DENSITY_CGS_WAVELENGTH = PHOTON_COUNT / (u.s * u.cm**3)
+
+
 PHOTON_SPECTRAL_RADIANCE = PHOTON_COUNT / (u.cm**2 * u.s * u.nm * u.arcsec**2)
+PHOTON_SPECTRAL_RADIANCE_SR = u.photon / (u.cm**2 * u.nm * u.s * u.sr)
+
 SURFACE_BRIGHTNESS = u.mag / u.arcsec**2
 SPECTRAL_RADIANCE = u.W / (u.m**2 * u.sr * u.um)
 SPECTRAL_RADIANCE_CGS = u.erg / (u.s * u.cm**2 * u.arcsec**2 * u.nm)
-
+SPECTRAL_RADIANCE_CGS_AA = u.erg / (u.cm**2 * u.AA * u.s * u.sr)
 # Dimensionless units
 DIMENSIONLESS = u.dimensionless_unscaled
 
@@ -66,11 +79,16 @@ PIXEL = u.pix
 ELECTRON = u.electron
 
 # Derived units
-DARK_CURRENT = ELECTRON / (PIXEL * TIME)
+DARK_CURRENT = ELECTRON / (PIXEL * SECOND)
 READ_NOISE = ELECTRON / (PIXEL * READ)
-READ_TIME = TIME / READ
+READ_TIME = SECOND / READ
 CLOCK_INDUCED_CHARGE = ELECTRON / (PIXEL * FRAME)  # from Chris 2019 paper
 QUANTUM_EFFICIENCY = ELECTRON / PHOTON_COUNT
+COUNT_RATE = ELECTRON / SECOND
+
+
+# Equivalencies
+EQUIV_ANGLE = u.equivalencies.dimensionless_angles()
 
 
 def lambda_d_to_radians(
@@ -98,7 +116,7 @@ def lambda_d_to_radians(
         The angle in radians
     """
     return (value_lod * wavelength / diameter).to(
-        u.rad, equivalencies=u.dimensionless_angles()
+        ANGLE, equivalencies=u.dimensionless_angles()
     )
 
 
@@ -155,7 +173,7 @@ def lambda_d_to_arcsec(
     u.Quantity
         Angular size in arcseconds
     """
-    return lambda_d_to_radians(value_lod, wavelength, diameter).to(u.arcsec)
+    return lambda_d_to_radians(value_lod, wavelength, diameter).to(ARCSEC)
 
 
 def arcsec_to_lambda_d(
@@ -182,7 +200,7 @@ def arcsec_to_lambda_d(
     u.Quantity
         Angular size in λ/D
     """
-    return radians_to_lambda_d(angle.to(u.rad), wavelength, diameter)
+    return radians_to_lambda_d(angle.to(ANGLE), wavelength, diameter)
 
 
 def arcsec_to_au(angle: u.Quantity, distance: u.Quantity) -> u.Quantity:
@@ -204,7 +222,7 @@ def arcsec_to_au(angle: u.Quantity, distance: u.Quantity) -> u.Quantity:
     u.Quantity
         The corresponding distance in AU
     """
-    return (angle.to(u.radian).value * distance).to(u.au)
+    return (angle.to_value(RADIAN) * distance).to(AU)
 
 
 def to_arcsec(quantity: u.Quantity, observer_distance: u.Quantity) -> float:
@@ -227,7 +245,7 @@ def to_arcsec(quantity: u.Quantity, observer_distance: u.Quantity) -> float:
     float
         The corresponding angular size in arcsec
     """
-    return np.arctan(quantity / observer_distance).to(u.arcsec).value
+    return np.arctan(quantity / observer_distance).to_value(ARCSEC)
 
 
 # Automatically generate ALL_UNITS list

@@ -290,7 +290,7 @@ def test_calculate_snr(mock_parameters):
         mock_builder.create_observatory.return_value = mock_observatory
 
         # Call the function under test
-        snr, validation_variables = calculate_snr(mock_parameters, 1.0, False)
+        snr, validation_variables = calculate_snr(mock_parameters, 1.0)
 
         # Assert the results
         assert np.array_equal(snr, np.array([10.0]))
@@ -328,7 +328,7 @@ def test_calculate_snr(mock_parameters):
         mock_builder.create_observatory.return_value = mock_observatory
 
         # Call the function under test
-        snr, validation_variables = calculate_snr(mock_parameters, 1.0, False)
+        snr, validation_variables = calculate_snr(mock_parameters, 1.0)
 
         # Assert the results
         assert np.array_equal(snr, np.array([10.0]))
@@ -339,3 +339,67 @@ def test_calculate_snr(mock_parameters):
         mock_scene.assert_called_once()
         mock_builder.create_observatory.assert_called_once()
         mock_calculate.assert_called_once()
+
+
+@patch("pyEDITH.cli.set_verbosity")
+@patch("pyEDITH.cli.parse_input.read_configuration")
+@patch("pyEDITH.cli.calculate_texp")
+def test_main_verbose_levels(
+    mock_calculate_texp, mock_read_configuration, mock_set_verbosity
+):
+    """Test that verbose flags correctly set logging levels."""
+    mock_read_configuration.return_value = ({}, {})
+    mock_calculate_texp.return_value = (np.array([1.0]), {})
+
+    # Test default (no flag) - should be warning level
+    with patch("sys.argv", ["pyedith", "etc", "--edith", "test.edith"]):
+        with patch("builtins.print"):
+            main()
+            mock_set_verbosity.assert_called_with("warning")
+
+    mock_set_verbosity.reset_mock()
+
+    # Test -v flag - should be info level
+    with patch("sys.argv", ["pyedith", "-v", "etc", "--edith", "test.edith"]):
+        with patch("builtins.print"):
+            main()
+            mock_set_verbosity.assert_called_with("info")
+
+    mock_set_verbosity.reset_mock()
+    with patch("sys.argv", ["pyedith", "--verbose", "etc", "--edith", "test.edith"]):
+        with patch("builtins.print"):
+            main()
+            mock_set_verbosity.assert_called_with("info")
+
+    mock_set_verbosity.reset_mock()
+
+    # Test -vv flag - should be debug level
+    with patch("sys.argv", ["pyedith", "-vv", "etc", "--edith", "test.edith"]):
+        with patch("builtins.print"):
+            main()
+            mock_set_verbosity.assert_called_with("debug")
+
+    mock_set_verbosity.reset_mock()
+
+    # Test that --quiet flag sets error level.
+    with patch("sys.argv", ["pyedith", "-q", "etc", "--edith", "test.edith"]):
+        with patch("builtins.print"):
+            main()
+            mock_set_verbosity.assert_called_with("error")
+
+    mock_set_verbosity.reset_mock()
+
+    with patch("sys.argv", ["pyedith", "--quiet", "etc", "--edith", "test.edith"]):
+        with patch("builtins.print"):
+            main()
+            mock_set_verbosity.assert_called_with("error")
+
+    mock_set_verbosity.reset_mock()
+
+    # Both --quiet and -vv specified - quiet should win
+    with patch(
+        "sys.argv", ["pyedith", "--quiet", "-vv", "etc", "--edith", "test.edith"]
+    ):
+        with patch("builtins.print"):
+            main()
+            mock_set_verbosity.assert_called_with("error")

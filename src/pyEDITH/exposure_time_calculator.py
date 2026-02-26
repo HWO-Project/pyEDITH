@@ -6,8 +6,11 @@ import astropy.constants as c
 import astropy.units as u
 from astropy.modeling import models
 from .units import *
-from . import utils
+from . import utils, set_verbosity
 import pickle
+import logging
+
+logger = logging.getLogger("pyEDITH")
 
 
 def calculate_CRp(
@@ -55,8 +58,8 @@ def calculate_CRp(
     return (
         F0 * Fs_over_F0 * Fp_over_Fs * area * Upsilon * throughput * dlambda * nchannels
     ).to(
-        u.electron / (u.s),
-        equivalencies=u.equivalencies.dimensionless_angles(),
+        COUNT_RATE,
+        equivalencies=EQUIV_ANGLE,
     )
 
 
@@ -111,8 +114,8 @@ def calculate_CRbs(
         * nchannels
         / (pixscale**2)
     ).to(
-        u.electron / (u.s),
-        equivalencies=u.equivalencies.dimensionless_angles(),
+        COUNT_RATE,
+        equivalencies=EQUIV_ANGLE,
     )
 
 
@@ -160,8 +163,8 @@ def calculate_CRbz(
     return (
         F0 * Fzodi * skytrans * area * throughput * dlambda * nchannels * lod_arcsec**2
     ).to(
-        u.electron / (u.s),
-        equivalencies=u.equivalencies.dimensionless_angles(),
+        COUNT_RATE,
+        equivalencies=EQUIV_ANGLE,
     )
 
 
@@ -226,8 +229,8 @@ def calculate_CRbez(
         * nchannels
         * lod_arcsec**2
     ).to(
-        u.electron / (u.s),
-        equivalencies=u.equivalencies.dimensionless_angles(),
+        COUNT_RATE,
+        equivalencies=EQUIV_ANGLE,
     )  # this is to simplify the arcsec^2/arcsec^2 that somehow does not simplify by itself
 
 
@@ -275,8 +278,8 @@ def calculate_CRbbin(
     """
 
     return (F0 * Fbinary * skytrans * area * throughput * dlambda * nchannels).to(
-        u.electron / (u.s),
-        equivalencies=u.equivalencies.dimensionless_angles(),
+        COUNT_RATE,
+        equivalencies=EQUIV_ANGLE,
     )
 
 
@@ -324,19 +327,17 @@ def calculate_CRbth(
     """
 
     # Calculate blackbody radiation
-    bb = models.BlackBody(
-        temperature=temp, scale=1 * u.erg / (u.cm**2 * u.AA * u.s * u.sr)
-    )
+    bb = models.BlackBody(temperature=temp, scale=1 * SPECTRAL_RADIANCE_CGS_AA)
     Blambda_energy = bb(lam)
 
     # Convert to photon spectral radiance
     Blambda_photon = (Blambda_energy).to(
-        u.photon / (u.cm**2 * u.nm * u.s * u.sr), equivalencies=u.spectral_density(lam)
+        PHOTON_SPECTRAL_RADIANCE_SR, equivalencies=u.spectral_density(lam)
     )
 
     # Calculate thermal background count rate
     return (Blambda_photon * dlambda * area * (lod_rad * lod_rad) * emis * QE * dQE).to(
-        u.electron / u.s
+        COUNT_RATE
     )
 
 
@@ -411,8 +412,8 @@ def calculate_CRbd(
     return (
         (det_DC + read_noise_variance / det_tread + det_CIC / t_photon_count) * det_npix
     ).to(
-        u.electron / (u.s),
-        equivalencies=u.equivalencies.dimensionless_angles(),
+        COUNT_RATE,
+        equivalencies=EQUIV_ANGLE,
     )
 
 
@@ -603,7 +604,6 @@ def calculate_exposure_time_or_snr(
     observation: Observation,
     scene: AstrophysicalScene,
     observatory: Observatory,
-    verbose: bool,
     ETC_validation: bool = False,
     mode: str = "exposure_time",
 ) -> None:
@@ -629,8 +629,6 @@ def calculate_exposure_time_or_snr(
         contrast, stellar properties, and zodiacal light levels
     observatory : Observatory
         Observatory object containing telescope, detector, and coronagraph parameters
-    verbose : bool
-        If True, print detailed calculation information to the console
     ETC_validation : bool, optional
         If True, use specific parameter values for validation against the ETC,
         default is False
@@ -646,7 +644,9 @@ def calculate_exposure_time_or_snr(
         'IMAGER' or 'IFS'
 
     """
-
+    if ETC_validation:
+        set_verbosity(level="debug")
+        logger.debug("Verbosity level locked to 'DEBUG' to execute validation.")
     # Check modes
     if mode not in ["exposure_time", "signal_to_noise"]:
         raise ValueError("Invalid mode. Use 'exposure_time' or 'signal_to_noise'.")
@@ -676,26 +676,26 @@ def calculate_exposure_time_or_snr(
             deltalambda_nm = (
                 np.min(
                     [
-                        (observation.wavelength[ilambd].to(u.nm).value)
+                        (observation.wavelength[ilambd].to_value(NM))
                         / observatory.coronagraph.coronagraph_spectral_resolution,
                         observatory.coronagraph.bandwidth
-                        * (observation.wavelength[ilambd].to(u.nm).value),
+                        * (observation.wavelength[ilambd].to_value(NM)),
                     ]
                 )
-                * u.nm
+                * NM
             )  # nanometers
             if (
                 observatory.coronagraph.bandwidth
-                * observation.wavelength[ilambd].to(u.nm).value
-                >= observation.wavelength[ilambd].to(u.nm).value
+                * observation.wavelength[ilambd].to_value(NM)
+                >= observation.wavelength[ilambd].to_value(NM)
                 / observatory.coronagraph.coronagraph_spectral_resolution
             ):
-                print(
-                    "WARNING: Bandwidth larger than what the coronagraph allows. Selecting widest possible bandwidth..."
+                logger.warning(
+                    "Bandwidth larger than what the coronagraph allows. Selecting widest possible bandwidth..."
                 )
         elif observatory.observing_mode == "IFS":
             # the effective bandwidth is the width of the spectral element
-            deltalambda_nm = observation.delta_wavelength[ilambd].to(u.nm)
+            deltalambda_nm = observation.delta_wavelength[ilambd].to(NM)
         else:
             raise ValueError("Invalid observation mode. Choose 'IMAGER' or 'IFS'.")
 
@@ -712,12 +712,12 @@ def calculate_exposure_time_or_snr(
         )
 
         # Convert to arcseconds
-        lod_arcsec = lod_rad.to(u.arcsec)
+        lod_arcsec = lod_rad.to(ARCSEC)
 
-        area_cm2 = observatory.telescope.Area.to(u.cm**2)
+        area_cm2 = observatory.telescope.Area.to(AREA)
 
         detpixscale_lod = arcsec_to_lambda_d(
-            observatory.detector.pixscale_mas.to(u.arcsec),
+            observatory.detector.pixscale_mas.to(ARCSEC),
             observation.wavelength[ilambd].to(LENGTH),
             observatory.telescope.diameter.to(LENGTH),
         )  # LAMBDA_D units
@@ -753,7 +753,7 @@ def calculate_exposure_time_or_snr(
             observatory.telescope.diameter.to(LENGTH),
         )  # going from LAMBDA_D to radians
 
-        oneopixscale_arcsec = 1 * PIXEL / pixscale_rad.to(u.arcsec)
+        oneopixscale_arcsec = 1 * PIXEL / pixscale_rad.to(ARCSEC)
 
         # Measure coronagraph performance at each IWA
         (
@@ -776,7 +776,7 @@ def calculate_exposure_time_or_snr(
         )
 
         if ETC_validation:
-            print("Fixing det_npix for validation...")
+            logger.debug("Fixing det_npix for validation...")
 
             det_npix = observatory.detector.det_npix_input * PIXEL
         else:
@@ -967,7 +967,7 @@ def calculate_exposure_time_or_snr(
 
                     # calculate the exozodi noisefloor to account for imperfect exozodi removal
                     CRnf_ez = calculate_CRnf_ez(
-                        CRbez[0]
+                        CRbez
                         * observatory.coronagraph.omega_lod[
                             int(np.floor(iy)), int(np.floor(ix)), iratio
                         ].value,
@@ -1026,8 +1026,8 @@ def calculate_exposure_time_or_snr(
 
                     # (for exposure time mode) Check if it's above the noise floor
                     if mode == "exposure_time" and CRp <= CRnf:
-                        print(
-                            "WARNING: Count rate of the planet smaller than the noise floor. Hardcoded infinity results."
+                        logger.error(
+                            "Count rate of the planet smaller than the noise floor. Hardcoded infinity results."
                         )
 
                         observation.exptime[ilambd] = np.inf
@@ -1104,7 +1104,7 @@ def calculate_exposure_time_or_snr(
                         det_CR,
                     )
                     if ETC_validation:
-                        print("Fixing t_photon_count for validation...")
+                        logger.debug("Fixing t_photon_count for validation...")
                         # the ETC validation (Stark+2025) fixed the frame rate
                         # t_photon_count = 1 / (det_CRp.value) * SECOND / FRAME
                         t_photon_count = observatory.detector.t_photon_count_input
@@ -1238,7 +1238,7 @@ def calculate_exposure_time_or_snr(
                         "dist": scene.dist,
                         "D": observatory.telescope.diameter,
                         "A_cm": area_cm2,
-                        "wavelength": observation.wavelength[ilambd].to(u.nm),
+                        "wavelength": observation.wavelength[ilambd].to(NM),
                         "deltalambda_nm": deltalambda_nm,
                         "snr": observation.SNR[ilambd],
                         "nzodis": scene.nzodis,
@@ -1323,8 +1323,8 @@ def calculate_exposure_time_or_snr(
                     }
 
                 else:
-                    print(
-                        "WARNING: Photometric aperture is not large enough. Hardcoded infinity results."
+                    logger.error(
+                        "Photometric aperture is not large enough. Hardcoded infinity results."
                     )
                     if mode == "exposure_time":
                         observation.exptime[ilambd] = np.inf
@@ -1332,15 +1332,39 @@ def calculate_exposure_time_or_snr(
                         observation.fullsnr[ilambd] = np.inf
 
         else:
-            print(
-                "WARNING: Planet outside OWA or inside IWA. Hardcoded infinity results."
-            )
+            if not (
+                (
+                    sp_lod > observatory.coronagraph.minimum_IWA
+                )  # check that the separation in l/D is more than the minimum allowed IWA
+                and (
+                    sp_lod < observatory.coronagraph.maximum_OWA
+                )  # check that the separation in l/D is less than the maximum allowed OWA
+            ):
+                logger.error(
+                    "Planet outside OWA or inside IWA. Hardcoded infinity results."
+                )
+
+            if not (
+                (ix >= 0)  # check that x pixel is positive
+                and (
+                    ix < observatory.coronagraph.npix
+                )  # check that it is less than the maximum pixel number
+                and (iy >= 0)  # check that the y pixel is positive
+                and (
+                    iy < observatory.coronagraph.npix
+                )  # check that it is less than the maximum pixel number
+            ):
+
+                logger.error(
+                    "Planet outside coronagraph YIP image. Hardcoded infinity results."
+                )
             if mode == "exposure_time":
                 observation.exptime[ilambd] = np.inf
             elif mode == "signal_to_noise":
                 observation.fullsnr[ilambd] = np.inf
 
-        if verbose:
+        # if logging is at a DEBUG level, print all variables
+        if logger.isEnabledFor(logging.DEBUG):
             utils.print_all_variables(
                 observation,
                 scene,

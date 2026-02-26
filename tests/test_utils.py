@@ -9,7 +9,7 @@ from pyEDITH.units import (
     INV_SQUARE_ARCSEC,
     QUANTUM_EFFICIENCY,
     LENGTH,
-    PHOTON_FLUX_DENSITY
+    PHOTON_FLUX_DENSITY,
 )
 import pytest
 import os
@@ -221,6 +221,38 @@ def test_print_array_info():
     assert "Shape: (0,)" in output
     assert "Array is empty" in output
 
+    # Test with Integer
+    file = StringIO()
+    int_array = np.array(42)
+    print_array_info(file, "int_scalar", int_array, mode="full_info")
+    output = file.getvalue()
+    assert "int_scalar:" in output
+    assert "Shape: scalar" in output
+    assert "Value: 42" in output  # Should use :d format for integers
+
+    # Test with Floating point
+    file = StringIO()
+    test_array = np.array(3.14)
+    print_array_info(file, "test_scalar", test_array, mode="validation")
+    output = file.getvalue()
+    assert "test_scalar:" in output
+    assert "value: 3.14" in output
+
+    # Test print_array_info with a scalar containing None. (full_info+validation)
+    file = StringIO()
+    none_array = np.array(None)
+    print_array_info(file, "none_scalar", none_array, mode="full_info")
+    output = file.getvalue()
+    assert "none_scalar:" in output
+    assert "Value: None" in output
+
+    file = StringIO()
+    none_array = np.array(None)
+    print_array_info(file, "none_scalar_val", none_array, mode="validation")
+    output = file.getvalue()
+    assert "none_scalar_val:" in output
+    assert "value: None" in output
+
 
 @pytest.mark.parametrize("mode", ["validation", "full_info"])
 def test_print_all_variables(mode):
@@ -396,9 +428,7 @@ def test_synthesize_observation():
     mock_scene.Fp_over_Fs = np.array([1e-6, 1.5e-6, 2e-6])
 
     # Test with default parameters
-    obs, noise = synthesize_observation(
-        snr_arr, mock_scene
-    )
+    obs, noise = synthesize_observation(snr_arr, mock_scene)
 
     assert obs.shape == (3,)
     assert noise.shape == (3,)
@@ -406,19 +436,13 @@ def test_synthesize_observation():
     assert np.all(np.isfinite(noise))
 
     # Test with set random_seed
-    obs1, noise1 = synthesize_observation(
-        snr_arr, mock_scene, random_seed=42
-    )
-    obs2, noise2 = synthesize_observation(
-        snr_arr, mock_scene, random_seed=42
-    )
+    obs1, noise1 = synthesize_observation(snr_arr, mock_scene, random_seed=42)
+    obs2, noise2 = synthesize_observation(snr_arr, mock_scene, random_seed=42)
     np.testing.assert_array_equal(obs1, obs2)
     np.testing.assert_array_equal(noise1, noise2)
 
     # Test with set set_below_zero
-    obs, noise = synthesize_observation(
-        snr_arr, mock_scene, set_below_zero=-999
-    )
+    obs, noise = synthesize_observation(snr_arr, mock_scene, set_below_zero=-999)
     assert np.all(obs[obs < 0] == -999)
 
 
@@ -456,8 +480,8 @@ def test_gen_wavelength_grid():
 def test_regrid_wavelengths():
     input_wls = np.linspace(0.2, 2.0, 100)
     res = [50, 100, 150]
-    lam_low = [0.3, 0.5, 1.]
-    lam_high = [0.5, 1., 1.7]
+    lam_low = [0.3, 0.5, 1.0]
+    lam_high = [0.5, 1.0, 1.7]
     lam, dlam = regrid_wavelengths(input_wls, res, lam_low, lam_high)
 
     assert np.all(np.diff(lam) > 0)
@@ -473,23 +497,27 @@ def test_regrid_wavelengths():
         AssertionError,
         match="Your minimum input wavelength is greater than first channel lower boundary.",
     ):
-        regrid_wavelengths(input_wls, [100, 200], [0.1, 1.], [1., 1.7])  # lower boundary outside input range
+        regrid_wavelengths(
+            input_wls, [100, 200], [0.1, 1.0], [1.0, 1.7]
+        )  # lower boundary outside input range
 
     with pytest.raises(
         AssertionError,
         match="Your maximum input wavelength is less than last channel upper boundary.",
     ):
-        regrid_wavelengths(input_wls, [100, 200], [0.5, 1.], [1., 2.1])  # upper boundary outside input range
+        regrid_wavelengths(
+            input_wls, [100, 200], [0.5, 1.0], [1.0, 2.1]
+        )  # upper boundary outside input range
 
     # test no bounds
     regrid_wavelengths(input_wls, [100])  # no bounds
 
 
 def test_regrid_spec_gauss():
-    input_wls = np.linspace(0.4, 2.0, 100) 
+    input_wls = np.linspace(0.4, 2.0, 100)
     input_spec = np.random.rand(100) * PHOTON_FLUX_DENSITY
-    new_lam = np.linspace(0.5, 1.9, 50) 
-    new_dlam = np.gradient(new_lam) 
+    new_lam = np.linspace(0.5, 1.9, 50)
+    new_dlam = np.gradient(new_lam)
 
     spec_regrid = regrid_spec_gaussconv(input_wls, input_spec, new_lam, new_dlam)
 
