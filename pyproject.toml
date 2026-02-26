@@ -2,34 +2,31 @@
 name = "pyEDITH"
 version = "1.5.1"
 authors = [
-  { name="Eleonora Alei", email="eleonora.alei@nasa.gov" },
-  { name="Miles Currie", email="miles.h.currie@nasa.gov" },
+  { name = "Eleonora Alei", email = "eleonora.alei@nasa.gov" },
+  { name = "Miles Currie", email = "miles.h.currie@nasa.gov" },
 ]
 description = "Exposure Direct Imaging Timer for HWO (Python Version)"
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
 ]
 dependencies = [
   "numpy<2.3",
   "scipy",
   "astropy",
   "pandas",
-  "yippy",
+  "yippy>=2.0",
   "openpyxl",
   "synphot",
-  "eacy"
+  "eacy",
 ]
 
 # Optional dependencies for testing
 [project.optional-dependencies]
-test = [
-  "pytest",
-  "pytest-cov"
-]
+test = ["pytest", "pytest-cov"]
 
 [project.urls]
 Homepage = "https://github.com/eleonoraalei/pyEDITH/"
@@ -40,12 +37,12 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-package-dir = {"" = "src"}
-packages = ["pyEDITH","pyEDITH.components"]
+package-dir = { "" = "src" }
+packages = ["pyEDITH", "pyEDITH.components"]
 include-package-data = true
 
 [tool.setuptools.package-data]
-"pyEDITH.components" = ["registry.json"] 
+"pyEDITH.components" = ["registry.json"]
 
 [project.scripts]
 pyedith = "pyEDITH.cli:main"
