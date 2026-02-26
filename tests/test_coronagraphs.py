@@ -332,7 +332,18 @@ def test_coronagraph_yip_init():
 
 
 @pytest.fixture
-def mock_yippy_object(spec_set=["header", "sky_trans", "offax", "stellar_intens"]):
+def mock_yippy_object(
+    spec_set=[
+        "header",
+        "sky_trans",
+        "offax",
+        "stellar_intens",
+        "separation_map",
+        "core_area_map",
+        "throughput_map",
+        "core_mean_intensity_map",
+    ],
+):
     mock_yippy = MagicMock(spec_set=spec_set)
     mock_yippy.header.pixscale.value = 0.25
     mock_yippy.header.naxis1 = 100
@@ -343,10 +354,31 @@ def mock_yippy_object(spec_set=["header", "sky_trans", "offax", "stellar_intens"
     mock_yippy.offax.y_offsets = np.linspace(0, 10, 11)
     mock_yippy.offax.reshaped_psfs = np.random.rand(11, 1, 100, 100)
     mock_yippy.stellar_intens.return_value = np.random.rand(100, 100)
+
+    y, x = np.mgrid[:100, :100]
+    r_pix = np.sqrt((x - 50) ** 2 + (y - 50) ** 2)
+    sep_map = r_pix * 0.25
+    mock_yippy.separation_map.return_value = sep_map
+    mock_yippy.core_area_map.return_value = np.full((100, 100), 0.0025)
+    mock_yippy.throughput_map.return_value = np.full((100, 100), 0.3)
+    mock_yippy.core_mean_intensity_map.return_value = np.full((100, 100), 1e-10)
     return mock_yippy
 
+
 @pytest.fixture
-def mock_yippy_object_incl_nrolls(spec_set=["header", "sky_trans", "offax", "stellar_intens", "nrolls"]):
+def mock_yippy_object_incl_nrolls(
+    spec_set=[
+        "header",
+        "sky_trans",
+        "offax",
+        "stellar_intens",
+        "nrolls",
+        "separation_map",
+        "core_area_map",
+        "throughput_map",
+        "core_mean_intensity_map",
+    ],
+):
     mock_yippy = MagicMock(spec_set=spec_set)
     mock_yippy.header.pixscale.value = 0.25
     mock_yippy.header.naxis1 = 100
@@ -357,7 +389,16 @@ def mock_yippy_object_incl_nrolls(spec_set=["header", "sky_trans", "offax", "ste
     mock_yippy.offax.y_offsets = np.linspace(0, 10, 11)
     mock_yippy.offax.reshaped_psfs = np.random.rand(11, 1, 100, 100)
     mock_yippy.stellar_intens.return_value = np.random.rand(100, 100)
+
+    y, x = np.mgrid[:100, :100]
+    r_pix = np.sqrt((x - 50) ** 2 + (y - 50) ** 2)
+    sep_map = r_pix * 0.25
+    mock_yippy.separation_map.return_value = sep_map
+    mock_yippy.core_area_map.return_value = np.full((100, 100), 0.0025)
+    mock_yippy.throughput_map.return_value = np.full((100, 100), 0.3)
+    mock_yippy.core_mean_intensity_map.return_value = np.full((100, 100), 1e-10)
     return mock_yippy
+
 
 @pytest.fixture
 def mock_instrument():
@@ -471,7 +512,7 @@ def test_coronagraph_yip_load_configuration_IMAGER(
     assert coronagraph.Istar.shape == (coronagraph.npix, coronagraph.npix)
     assert not np.all(coronagraph.Istar == 0)
 
-    # Check noisefloor == should be zero because no user-provided parameters
+    # Check noisefloor
     assert coronagraph.noisefloor.shape == (coronagraph.npix, coronagraph.npix)
     captured = capsys.readouterr()
     assert (
@@ -518,7 +559,6 @@ def test_coronagraph_yip_load_configuration_IMAGER(
     }
     coronagraph.load_configuration(parameters, mediator)
     captured = capsys.readouterr()
-    assert "Setting the noise floor via user-supplied noisefloor_PPF..." in captured.out
 
     assert coronagraph.noisefloor.shape == (coronagraph.npix, coronagraph.npix)
     assert coronagraph.noisefloor.unit == DIMENSIONLESS
@@ -572,7 +612,6 @@ def test_coronagraph_yip_load_configuration_IFS(
         "WARNING: Both psf_trunc_ratio and photometric_aperture_radius are specified. Preferring psf_trunc_ratio going forward..."
         in captured.out
     )
-    assert "Using psf_trunc_ratio to calculate Omega..." in captured.out
 
     # Check coronagraph_optical_throughput
     assert len(coronagraph.coronagraph_optical_throughput) == 3
@@ -580,6 +619,7 @@ def test_coronagraph_yip_load_configuration_IFS(
         coronagraph.coronagraph_optical_throughput.value,
         [0.41891199, 0.43711322, 0.40535648],
     ).all()
+
 
 @patch("eacy.load_instrument")
 @patch("eacy.load_telescope")
@@ -614,7 +654,6 @@ def test_coronagraph_yip_load_configuration_yippycoro_nrolls(
         "WARNING: Both psf_trunc_ratio and photometric_aperture_radius are specified. Preferring psf_trunc_ratio going forward..."
         in captured.out
     )
-    assert "Using psf_trunc_ratio to calculate Omega..." in captured.out
 
     # Check coronagraph_optical_throughput
     assert len(coronagraph.coronagraph_optical_throughput) == 3
@@ -822,8 +861,7 @@ def test_coronagraph_yip_load_configuration_high_psf_trunc_ratio(
 
     coronagraph.load_configuration(parameters, mediator)
     captured = capsys.readouterr()
-    assert "Using psf_trunc_ratio to calculate Omega..." in captured.out
     assert coronagraph.omega_lod.shape == (coronagraph.npix, coronagraph.npix, 1)
     assert coronagraph.omega_lod.unit == LAMBDA_D**2
+    # 0.0025 matches the old internally-computed value for this pixscale
     assert np.allclose(coronagraph.omega_lod.value, 0.0025, rtol=1e-6, atol=1e-9)
-    # 0.0025 is (1*  (self.DEFAULT_CONFIG["pixscale"] / resolvingfactor) ** 2)    where resolvingfactor = int(np.ceil(self.DEFAULT_CONFIG["pixscale"] / 0.05)
