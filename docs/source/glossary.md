@@ -156,7 +156,7 @@ where `omega_lod` is the solid angle of the photometric aperture.
 | nzodis                  | Scalar    | Zodi                         | Amount of exozodi around target star              | Yes           |
 | ra                      | Scalar    | Degree                       | Right ascension of target star                    | Yes           |
 | dec                     | Scalar    | Degree                       | Declination of target star                        | Yes           |
-| semimajor_axis              | Scalar | Astronomical Units                    | Scalar                   | Semimajor axis of the planet's orbit (used to calculate separation; assumes face-on orbit)                           |  Yes   |
+| semimajor_axis              | Scalar | Astronomical Units                    | Semimajor axis of the planet's orbit (used to calculate separation; assumes face-on orbit)                           |  Yes   |
 | separation              | Scalar    | Arcsecond                    | Separation of planet                              | Yes           |
 | xp                      | Scalar    | Arcsecond                    | X-coordinate of planet (defaults to zero for now)                           | No            |
 | yp                      | Scalar    | Arcsecond                    | Y-coordinate of planet                            | No            |
