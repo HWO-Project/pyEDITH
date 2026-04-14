@@ -1,6 +1,6 @@
 [project]
 name = "pyEDITH"
-version = "1.5.1"
+version = "1.5.2"
 authors = [
   { name = "Eleonora Alei", email = "eleonora.alei@nasa.gov" },
   { name = "Miles Currie", email = "miles.h.currie@nasa.gov" },
@@ -22,6 +22,7 @@ dependencies = [
   "openpyxl",
   "synphot",
   "eacy",
+  "hwostyle",
 ]
 
 # Optional dependencies for testing
