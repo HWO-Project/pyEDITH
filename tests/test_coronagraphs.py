@@ -926,3 +926,101 @@ def test_coronagraph_yip_load_configuration_high_psf_trunc_ratio(
         assert coronagraph.omega_lod.unit == LAMBDA_D**2
         # 0.0025 matches the old internally-computed value for this pixscale
         assert np.allclose(coronagraph.omega_lod.value, 0.0025, rtol=1e-6, atol=1e-9)
+
+
+def test_coronagraph_yip_init_validation(yippy_coronagraph):
+    """Validate __init__ guards: must provide exactly one of path or yippy_coro."""
+    with pytest.raises(
+        ValueError, match="Either a path or a yippy_coro must be provided"
+    ):
+        CoronagraphYIP()
+
+    with pytest.raises(
+        ValueError, match="Only one of path or yippy_coro can be provided"
+    ):
+        CoronagraphYIP(path="some_path", yippy_coro=yippy_coronagraph)
+
+
+@patch("eacy.load_instrument")
+@patch("eacy.load_telescope")
+def test_coronagraph_yip_load_configuration_with_yippy_coro(
+    mock_load_telescope,
+    mock_load_instrument,
+    mock_instrument,
+    mock_telescope,
+    yippy_coronagraph,
+    caplog,
+):
+    """Pre-constructed yippy_coro is used directly; yippycoro() is not called."""
+    with caplog.at_level(logging.DEBUG, logger="pyEDITH"):
+        mock_load_instrument.return_value = mock_instrument
+        mock_load_telescope.return_value = mock_telescope
+
+        coronagraph = CoronagraphYIP(yippy_coro=yippy_coronagraph)
+        parameters = {
+            "observing_mode": "IMAGER",
+            "maximum_OWA": 90.0,
+            "bandwidth": 0.1,
+            "nrolls": 2,
+            "nchannels": 1,
+            "az_avg": True,
+        }
+        mediator = MockMediatorWithHighPSFTruncRatio()
+        coronagraph.load_configuration(parameters, mediator)
+
+        assert coronagraph.npix == yippy_coronagraph.header.naxis1
+        assert hasattr(coronagraph, "Istar")
+        assert hasattr(coronagraph, "noisefloor")
+
+        # Trigger the mismatch warning by using a different psf_trunc_ratio
+        caplog.clear()
+
+        class MediatorDifferentRatio(MockMediator_IMAGER):
+            def get_observation_parameter(self, param):
+                if param == "psf_trunc_ratio":
+                    return [0.99] * DIMENSIONLESS
+                if param == "photometric_aperture_radius":
+                    return None
+                return super().get_observation_parameter(param)
+
+        coronagraph2 = CoronagraphYIP(yippy_coro=yippy_coronagraph)
+        mediator2 = MediatorDifferentRatio()
+        coronagraph2.load_configuration(parameters, mediator2)
+
+        assert any(
+            "Pre-constructed yippy_coro has psf_trunc_ratio=" in record.message
+            for record in caplog.records
+            if record.levelno == logging.WARNING
+        )
+
+
+@patch("eacy.load_instrument")
+@patch("eacy.load_telescope")
+def test_coronagraph_yip_load_configuration_az_avg_false(
+    mock_load_telescope,
+    mock_load_instrument,
+    mock_instrument,
+    mock_telescope,
+    yippy_coronagraph,
+    caplog,
+):
+    """Exercise the stellar_intens branch when az_avg is False."""
+    with caplog.at_level(logging.DEBUG, logger="pyEDITH"):
+        mock_load_instrument.return_value = mock_instrument
+        mock_load_telescope.return_value = mock_telescope
+
+        coronagraph = CoronagraphYIP(yippy_coro=yippy_coronagraph)
+        parameters = {
+            "observing_mode": "IMAGER",
+            "maximum_OWA": 90.0,
+            "bandwidth": 0.1,
+            "nrolls": 2,
+            "nchannels": 1,
+            "az_avg": False,
+        }
+        mediator = MockMediatorWithHighPSFTruncRatio()
+        coronagraph.load_configuration(parameters, mediator)
+
+        assert coronagraph.Istar.shape == (coronagraph.npix, coronagraph.npix)
+        assert coronagraph.Istar.unit == DIMENSIONLESS
+        assert not np.all(coronagraph.Istar == 0)

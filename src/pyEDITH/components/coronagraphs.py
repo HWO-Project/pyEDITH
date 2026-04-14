@@ -512,10 +512,26 @@ class CoronagraphYIP(Coronagraph):
             )
 
         # ***** Load the YIP using yippy *****
+        obs_trunc_ratio = mediator.get_observation_parameter("psf_trunc_ratio")
+        if obs_trunc_ratio is not None:
+            # Strip units so yippy receives a plain float
+            obs_trunc_float = float(obs_trunc_ratio)
+        else:
+            obs_trunc_float = None
+
         if self.yippy_coro is not None:
             yippy_obj = self.yippy_coro
+            if (
+                obs_trunc_float is not None
+                and yippy_obj.psf_trunc_ratio != obs_trunc_float
+            ):
+                logger.warning(
+                    f"Pre-constructed yippy_coro has psf_trunc_ratio="
+                    f"{yippy_obj.psf_trunc_ratio}, but observation specifies "
+                    f"{obs_trunc_float}. The pre-constructed value will be used."
+                )
         else:
-            yippy_obj = yippycoro(self.path)
+            yippy_obj = yippycoro(self.path, psf_trunc_ratio=obs_trunc_float)
 
         # get nrolls from yippy, if it exists in the YIP files
         if hasattr(yippy_obj, "nrolls"):

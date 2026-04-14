@@ -46,6 +46,7 @@ run_pyedith
 imaging_tutorial
 spectroscopy_tutorial
 advanced
+yippy_guide
 glossary
 validation
 api

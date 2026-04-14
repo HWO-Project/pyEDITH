@@ -26,7 +26,7 @@ dependencies = [
 
 # Optional dependencies for testing
 [project.optional-dependencies]
-test = ["pytest", "pytest-cov"]
+test = ["pytest", "pytest-cov", "pooch"]
 
 [project.urls]
 Homepage = "https://github.com/eleonoraalei/pyEDITH/"
