@@ -666,121 +666,129 @@ def test_coronagraph_yip_load_configuration_IFS(
 
 
 # TODO: revisit with new implementation
-# @patch("eacy.load_instrument")
-# @patch("eacy.load_telescope")
-# @patch("pyEDITH.components.coronagraphs.yippycoro")
-# def test_coronagraph_yip_load_configuration_with_photometric_aperture_radius(
-#     mock_yippycoro,
-#     mock_load_telescope,
-#     mock_load_instrument,
-#     mock_yippy_object,
-#     mock_instrument,
-#     mock_telescope,
-#     caplog,
-# ):
-#     with caplog.at_level(logging.DEBUG, logger="pyEDITH"):
-#         mock_load_instrument.return_value = mock_instrument
-#         mock_load_telescope.return_value = mock_telescope
-#         mock_yippycoro.return_value = mock_yippy_object
+@patch("eacy.load_instrument")
+@patch("eacy.load_telescope")
+@patch("pyEDITH.components.coronagraphs.yippycoro")
+def test_coronagraph_yip_load_configuration_with_photometric_aperture_radius(
+    mock_yippycoro,
+    mock_load_telescope,
+    mock_load_instrument,
+    mock_yippy_object,
+    mock_instrument,
+    mock_telescope,
+    caplog,
+):
+    with caplog.at_level(logging.DEBUG, logger="pyEDITH"):
+        mock_load_instrument.return_value = mock_instrument
+        mock_load_telescope.return_value = mock_telescope
+        mock_yippycoro.return_value = mock_yippy_object
 
-#         coronagraph = CoronagraphYIP(path="test_path")
-#         parameters = {
-#             "observing_mode": "IMAGER",
-#             "maximum_OWA": 90.0,
-#             "bandwidth": 0.1,
-#             "nrolls": 2,
-#             "nchannels": 1,
-#             "Tcore": 0.5 * DIMENSIONLESS,
-#         }
+        coronagraph = CoronagraphYIP(path="test_path")
+        parameters = {
+            "observing_mode": "IMAGER",
+            "maximum_OWA": 90.0,
+            "bandwidth": 0.1,
+            "photometric_aperture_radius": 0.85,
+            "nrolls": 2,
+            "nchannels": 1,
+            "Tcore": 0.5 * DIMENSIONLESS,
+        }
 
-#         mediator = MockMediator_IMAGER()
+        mediator = MockMediator_IMAGER()
 
-#         coronagraph.load_configuration(parameters, mediator)
-#         assert any(
-#             "Using photometric_aperture_radius to calculate Omega..." in record.message
-#             for record in caplog.records
-#             if record.levelno == logging.INFO
-#         )
-#         assert any(
-#             "Using user-defined Tcore..." in record.message
-#             for record in caplog.records
-#             if record.levelno == logging.INFO
-#         )
+        coronagraph.load_configuration(parameters, mediator)
+        assert any(
+            "Using photometric_aperture_radius to calculate Omega..." in record.message
+            for record in caplog.records
+            if record.levelno == logging.INFO
+        )
+        assert any(
+            "Using user-defined Tcore..." in record.message
+            for record in caplog.records
+            if record.levelno == logging.INFO
+        )
 
-#         # Check that omega_lod and photometric_aperture_throughput are calculated correctly
-#         assert coronagraph.omega_lod.shape == (coronagraph.npix, coronagraph.npix, 1)
-#         assert np.all(coronagraph.omega_lod == np.pi * 0.7**2 * LAMBDA_D**2)
+        # Check that omega_lod and photometric_aperture_throughput are calculated correctly
+        assert coronagraph.omega_lod.shape == (coronagraph.npix, coronagraph.npix, 1)
+        assert np.all(
+            coronagraph.omega_lod
+            == np.pi * parameters["photometric_aperture_radius"] ** 2 * LAMBDA_D**2
+        )
 
-#         assert coronagraph.photometric_aperture_throughput.shape == (
-#             coronagraph.npix,
-#             coronagraph.npix,
-#             1,
-#         )
-#         assert np.all(
-#             (coronagraph.photometric_aperture_throughput == 0.5 * DIMENSIONLESS)
-#             | (coronagraph.photometric_aperture_throughput == 0.0 * DIMENSIONLESS)
-#         )
-#         assert np.all(
-#             coronagraph.photometric_aperture_throughput[
-#                 coronagraph.r < coronagraph.minimum_IWA
-#             ]
-#             == 0.0 * DIMENSIONLESS
-#         )
-#         assert np.all(
-#             coronagraph.photometric_aperture_throughput[
-#                 coronagraph.r > coronagraph.maximum_OWA
-#             ]
-#             == 0.0 * DIMENSIONLESS
-#         )
+        assert coronagraph.photometric_aperture_throughput.shape == (
+            coronagraph.npix,
+            coronagraph.npix,
+            1,
+        )
+        assert np.all(
+            (coronagraph.photometric_aperture_throughput == 0.5 * DIMENSIONLESS)
+            | (coronagraph.photometric_aperture_throughput == 0.0 * DIMENSIONLESS)
+        )
+        assert np.all(
+            coronagraph.photometric_aperture_throughput[
+                coronagraph.r < coronagraph.minimum_IWA
+            ]
+            == 0.0 * DIMENSIONLESS
+        )
+        assert np.all(
+            coronagraph.photometric_aperture_throughput[
+                coronagraph.r > coronagraph.maximum_OWA
+            ]
+            == 0.0 * DIMENSIONLESS
+        )
 
-#         caplog.clear()
-#         # SAME TEST but no Tcore available, use default
-#         coronagraph = CoronagraphYIP(path="test_path")
-#         parameters = {
-#             "observing_mode": "IMAGER",
-#             "maximum_OWA": 90.0,
-#             "bandwidth": 0.1,
-#             "nrolls": 2,
-#             "nchannels": 1,
-#         }
+        caplog.clear()
+        # SAME TEST but no Tcore available, use default
+        coronagraph = CoronagraphYIP(path="test_path")
+        parameters = {
+            "observing_mode": "IMAGER",
+            "maximum_OWA": 90.0,
+            "photometric_aperture_radius": 0.85,
+            "bandwidth": 0.1,
+            "nrolls": 2,
+            "nchannels": 1,
+        }
 
-#         coronagraph.load_configuration(parameters, mediator)
-#         assert any(
-#             "Using photometric_aperture_radius to calculate Omega..." in record.message
-#             for record in caplog.records
-#             if record.levelno == logging.INFO
-#         )
-#         assert any(
-#             "Using default Tcore..." in record.message
-#             for record in caplog.records
-#             if record.levelno == logging.INFO
-#         )
+        coronagraph.load_configuration(parameters, mediator)
+        assert any(
+            "Using photometric_aperture_radius to calculate Omega..." in record.message
+            for record in caplog.records
+            if record.levelno == logging.INFO
+        )
+        assert any(
+            "Using default Tcore..." in record.message
+            for record in caplog.records
+            if record.levelno == logging.INFO
+        )
 
-#         # Check that omega_lod and photometric_aperture_throughput are calculated correctly
-#         assert coronagraph.omega_lod.shape == (coronagraph.npix, coronagraph.npix, 1)
-#         assert np.all(coronagraph.omega_lod == np.pi * 0.7**2 * LAMBDA_D**2)
+        # Check that omega_lod and photometric_aperture_throughput are calculated correctly
+        assert coronagraph.omega_lod.shape == (coronagraph.npix, coronagraph.npix, 1)
+        assert np.all(
+            coronagraph.omega_lod
+            == np.pi * parameters["photometric_aperture_radius"] ** 2 * LAMBDA_D**2
+        )
 
-#         assert coronagraph.photometric_aperture_throughput.shape == (
-#             coronagraph.npix,
-#             coronagraph.npix,
-#             1,
-#         )
-#         assert np.all(
-#             (coronagraph.photometric_aperture_throughput == 0.2968371 * DIMENSIONLESS)
-#             | (coronagraph.photometric_aperture_throughput == 0.0 * DIMENSIONLESS)
-#         )
-#         assert np.all(
-#             coronagraph.photometric_aperture_throughput[
-#                 coronagraph.r < coronagraph.minimum_IWA
-#             ]
-#             == 0.0 * DIMENSIONLESS
-#         )
-#         assert np.all(
-#             coronagraph.photometric_aperture_throughput[
-#                 coronagraph.r > coronagraph.maximum_OWA
-#             ]
-#             == 0.0 * DIMENSIONLESS
-#         )
+        assert coronagraph.photometric_aperture_throughput.shape == (
+            coronagraph.npix,
+            coronagraph.npix,
+            1,
+        )
+        assert np.all(
+            (coronagraph.photometric_aperture_throughput == 0.2968371 * DIMENSIONLESS)
+            | (coronagraph.photometric_aperture_throughput == 0.0 * DIMENSIONLESS)
+        )
+        assert np.all(
+            coronagraph.photometric_aperture_throughput[
+                coronagraph.r < coronagraph.minimum_IWA
+            ]
+            == 0.0 * DIMENSIONLESS
+        )
+        assert np.all(
+            coronagraph.photometric_aperture_throughput[
+                coronagraph.r > coronagraph.maximum_OWA
+            ]
+            == 0.0 * DIMENSIONLESS
+        )
 
 
 def test_coronagraph_yip_init_validation(yippy_coronagraph):

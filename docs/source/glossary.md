@@ -76,6 +76,8 @@
 | ------------------------------- | ------------------------ | ------------- | ------------------------------------------------------------ | ------------- |
 | Istar                           | [npix, npix]             | Dimensionless | Star intensity distribution (on-axis PSF)                                 | No            |
 | noisefloor                      | [npix, npix]             | Dimensionless | Noise floor of the coronagraph                               | No            |
+| photometric_aperture_radius      | Scalar    | λ/D           | Photometric aperture radius             | Yes           |
+| psf_trunc_ratio | Scalar    | Dimensionless | truncate the off-axis PSF at a threshold (thresh = psf_trunc_ratio * max(off-axis PSF))             | Yes           |
 | photometric_aperture_throughput                     | [npix, npix, npsfratios] | Dimensionless | fraction of light entering the coronagraph that ends up within the photometric core of the off-axis (planet) PSF assuming perfectly reflecting/transmitting optics, where the core is the solid angle area `Omega` and is set by either `psf_trunc_ratio` or `photometric_aperture_radius`.                                 | No            |
 | omega_lod                       | [npix, npix, npsfratios] | (λ/D)²        | Solid angle of the photometric aperture                      | No            |
 | skytrans                        | [npix, npix]             | Dimensionless | Sky transmission; the coronagraph’s performance when observing an infinitely extended source                                           | No            |
@@ -139,12 +141,11 @@ where `omega_lod` is the solid angle of the photometric aperture.
 | --------------- | --------- | ------------- | --------------------------------------- | ------------- |
 | wavelength      | [nlambda] | um      | Observation wavelengths                 | Yes           |
 | SNR             | [nlambda] | Dimensionless | Signal-to-noise ratio                   | Yes           |
-| photometric_aperture_radius      | Scalar    | λ/D           | Photometric aperture radius             | Yes           |
-| psf_trunc_ratio | Scalar    | Dimensionless | truncate the off-axis PSF at a threshold (thresh = psf_trunc_ratio * max(off-axis PSF))             | Yes           |
 | CRb_multiplier  | Scalar    | Dimensionless | Factor to multiply assuming differential imaging to remove background | Yes           |
 | td_limit        | Scalar    | s        | Limit placed on exposure times          | No            |
 | exptime         | [nlambda] | s        | Exposure time for each wavelength       | No            |
 | fullsnr         | [nlambda] | Dimensionless | Calculated SNR for each wavelength      | No            |
+| observing_mode | Scalar | String | Observing mode (e.g., 'IMAGER' or 'IFS') | Yes |
 
 ## Within `astrophysical_scene.py`
 | Variable Name           | Length    | Unit                         | Meaning                                           | User Editable |
@@ -177,7 +178,7 @@ where `omega_lod` is the solid angle of the photometric aperture.
 | optics_throughput | [nlambda] | Dimensionless | Optical throughput of the entire system | Yes* |
 | epswarmTrcold | [nlambda] | Dimensionless | Warm emissivity * cold transmission factor | Yes* |
 | total_throughput | [nlambda] | Dimensionless | Total throughput including optics and detector | No |
-| observing_mode | Scalar | String | Observing mode (e.g., 'IMAGER' or 'IFS') | Yes |
+
 
 ## Within `parse_input.py`
 | Variable Name      | Length | Unit    | Meaning                                  | User Editable |
