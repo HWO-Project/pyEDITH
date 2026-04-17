@@ -23,10 +23,6 @@ class Observation:
         Number of wavelength points.
     SNR : np.ndarray
         Signal-to-noise ratio array.
-    photometric_aperture_radius : float
-        Photometric aperture radius (in units of lambda/D).
-    psf_trunc_ratio : np.ndarray
-        PSF truncation ratio.
     tp : ndarray
         Exposure time of every planet (nmeananom x norbits x ntargs array).
     exptime : ndarray
@@ -62,8 +58,7 @@ class Observation:
         parameters : dict
             A dictionary containing observation parameters including wavelengths,
             SNR values, aperture settings, and observation mode settings. Must
-            include 'observing_mode', 'wavelength', 'snr', and either
-            'psf_trunc_ratio' or 'photometric_aperture_radius'
+            include 'observing_mode', 'wavelength', 'snr'.
 
         Raises
         ------
@@ -71,6 +66,9 @@ class Observation:
             If required parameters are missing or if regridding is requested without
             necessary parameters
         """
+        self.observing_mode = parameters["observing_mode"]
+        if self.observing_mode not in ["IMAGER", "IFS"]:
+            raise KeyError("Invalid observing mode. Must be 'IMAGER' or 'IFS'.")
 
         # -------- INPUTS ---------
         # Observational parameters
@@ -130,36 +128,6 @@ class Observation:
 
         self.SNR = parameters["snr"] * DIMENSIONLESS  # signal to noise # nlambd array
 
-        # Set defaults, replace if you can
-        self.photometric_aperture_radius = None
-        self.psf_trunc_ratio = None
-        if "psf_trunc_ratio" in parameters.keys():
-            self.psf_trunc_ratio = (
-                parameters["psf_trunc_ratio"] * DIMENSIONLESS
-            )  # scalar
-        elif "photometric_aperture_radius" in parameters.keys():
-            self.photometric_aperture_radius = (
-                parameters["photometric_aperture_radius"] * LAMBDA_D
-            )  # (lambd/D) # scalar
-
-        else:
-            raise KeyError(
-                "Either 'photometric_aperture_radius' or 'psf_trunc_ratio' must be provided in the parameters."
-            )
-        # If both are provided, we'll use psf_trunc_ratio and ignore photometric_aperture_radius
-        if (
-            "photometric_aperture_radius" in parameters
-            and "psf_trunc_ratio" in parameters
-            and parameters["photometric_aperture_radius"] is not None
-            and parameters["psf_trunc_ratio"] is not None
-        ):
-            logger.warning(
-                "Warning: Both 'photometric_aperture_radius' and 'psf_trunc_ratio' provided. Using 'psf_trunc_ratio' and ignoring 'photometric_aperture_radius'."
-            )
-            self.photometric_aperture_radius = (
-                None  # ignore photometric_aperture_radius by setting to None
-            )
-
         self.CRb_multiplier = float(parameters["CRb_multiplier"])
 
         self.nlambd = len(self.wavelength)
@@ -188,14 +156,10 @@ class Observation:
         Validate that all required observation parameters are present and correctly formatted.
 
         This method checks that all mandatory attributes exist on the observation
-        object and that they have the expected types and units. It specifically
-        verifies that either photometric_aperture_radius or psf_trunc_ratio is
-        defined but not necessarily both.
+        object and that they have the expected types and units.
 
         Raises
         ------
-        AttributeError
-            If neither photometric_aperture_radius nor psf_trunc_ratio is defined
         TypeError
             If an attribute has an incorrect type
         ValueError
@@ -207,21 +171,5 @@ class Observation:
             "SNR": DIMENSIONLESS,
             "CRb_multiplier": float,
         }
-
-        # Either photometric_aperture_radius or psf_trunc_ratio must be present
-        if (
-            hasattr(self, "photometric_aperture_radius")
-            and getattr(self, "photometric_aperture_radius") is not None
-        ):
-            expected_args["photometric_aperture_radius"] = LAMBDA_D
-        elif (
-            hasattr(self, "psf_trunc_ratio")
-            and getattr(self, "psf_trunc_ratio") is not None
-        ):
-            expected_args["psf_trunc_ratio"] = DIMENSIONLESS
-        else:
-            raise AttributeError(
-                "Observation must have either 'photometric_aperture_radius' or 'psf_trunc_ratio' attribute"
-            )
 
         utils.validate_attributes(self, expected_args)

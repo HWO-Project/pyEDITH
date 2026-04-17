@@ -21,7 +21,6 @@ def test_load_configuration(caplog):
             "wavelength": [0.5, 0.5, 0.5],
             "snr": [7.0, 7.0, 7.0],
             "regrid_wavelength": False,
-            "psf_trunc_ratio": 0.3,
             "CRb_multiplier": 2.0,
         }
 
@@ -46,7 +45,6 @@ def test_load_configuration(caplog):
         parameters = {
             "wavelength": [0.5, 0.55, 0.6],
             "snr": [7.0, 7.0, 7.0],
-            "photometric_aperture_radius": 0.85,
             "CRb_multiplier": 2.0,
             "observing_mode": "IMAGER",
         }
@@ -54,57 +52,6 @@ def test_load_configuration(caplog):
 
         assert np.all(obs.wavelength == parameters["wavelength"] * WAVELENGTH)
         assert np.all(obs.SNR == parameters["snr"] * DIMENSIONLESS)
-        assert (
-            obs.photometric_aperture_radius
-            == parameters["photometric_aperture_radius"] * LAMBDA_D
-        )
-        assert obs.CRb_multiplier == parameters["CRb_multiplier"]
-
-        # Test case when both are available
-        parameters = {
-            "wavelength": [0.5, 0.55, 0.6],
-            "snr": [7.0, 7.0, 7.0],
-            "photometric_aperture_radius": 0.85,
-            "psf_trunc_ratio": 0.3,
-            "CRb_multiplier": 2.0,
-            "observing_mode": "IMAGER",
-        }
-        obs.load_configuration(parameters)
-        assert any(
-            "Both 'photometric_aperture_radius' and 'psf_trunc_ratio' provided. Using 'psf_trunc_ratio' and ignoring 'photometric_aperture_radius'."
-            in record.message
-            for record in caplog.records
-            if record.levelno == logging.WARNING
-        )
-
-        assert np.all(obs.wavelength == parameters["wavelength"] * WAVELENGTH)
-        assert np.all(obs.SNR == parameters["snr"] * DIMENSIONLESS)
-        assert obs.psf_trunc_ratio == parameters["psf_trunc_ratio"] * DIMENSIONLESS
-        assert obs.CRb_multiplier == parameters["CRb_multiplier"]
-
-        # Test case when neither are available
-        parameters = {
-            "wavelength": [0.5, 0.55, 0.6],
-            "snr": [7.0, 7.0, 7.0],
-            "CRb_multiplier": 2.0,
-            "observing_mode": "IMAGER",
-        }
-        with pytest.raises(KeyError):
-            obs.load_configuration(parameters)
-
-        # Test psf_trunc_ratio case
-        parameters = {
-            "wavelength": [0.5, 0.55, 0.6],
-            "snr": [7.0, 7.0, 7.0],
-            "psf_trunc_ratio": 0.3,
-            "CRb_multiplier": 2.0,
-            "observing_mode": "IMAGER",
-        }
-        obs.load_configuration(parameters)
-
-        assert np.all(obs.wavelength == parameters["wavelength"] * WAVELENGTH)
-        assert np.all(obs.SNR == parameters["snr"] * DIMENSIONLESS)
-        assert obs.psf_trunc_ratio == parameters["psf_trunc_ratio"] * DIMENSIONLESS
         assert obs.CRb_multiplier == parameters["CRb_multiplier"]
 
         # Test single wavelength input
@@ -116,8 +63,15 @@ def test_load_configuration(caplog):
         assert len(obs.SNR) == 1
 
         # Test error handling
+        # General invalid key
         with pytest.raises(KeyError):
             obs.load_configuration({"invalid_key": 0})
+
+        # Specific message for observing_mode
+        with pytest.raises(
+            KeyError, match="Invalid observing mode. Must be 'IMAGER' or 'IFS'."
+        ):
+            obs.load_configuration({"observing_mode": "Invalid"})
 
         # Test IFS mode: spectral_resolution is not included
         parameters = {
@@ -126,7 +80,6 @@ def test_load_configuration(caplog):
             "lam_low": [0.5, 1.0],
             "lam_high": [1.0, 1.7],
             "regrid_wavelength": True,
-            "psf_trunc_ratio": 0.3,
             "CRb_multiplier": 2.0,
             "observing_mode": "IFS",
         }
@@ -140,7 +93,6 @@ def test_load_configuration(caplog):
             "lam_high": [1.0, 1.7],
             "spectral_resolution": [140, 40],
             "regrid_wavelength": True,
-            "psf_trunc_ratio": 0.3,
             "CRb_multiplier": 2.0,
             "observing_mode": "IFS",
         }
@@ -154,7 +106,6 @@ def test_load_configuration(caplog):
             "lam_low": [0.5, 1.0],
             "spectral_resolution": [140, 40],
             "regrid_wavelength": True,
-            "psf_trunc_ratio": 0.3,
             "CRb_multiplier": 2.0,
             "observing_mode": "IFS",
         }
@@ -169,7 +120,6 @@ def test_load_configuration(caplog):
             "lam_low": [0.5, 1.0],
             "lam_high": [1.0, 1.7],
             "regrid_wavelength": True,
-            "psf_trunc_ratio": 0.3,
             "CRb_multiplier": 2.0,
             "observing_mode": "IFS",
         }
@@ -193,8 +143,6 @@ def test_set_output_arrays():
     parameters = {
         "wavelength": [0.5, 0.55, 0.6],
         "snr": [7.0, 7.0, 7.0],
-        "photometric_aperture_radius": 0.85,
-        "psf_trunc_ratio": 0.3,
         "CRb_multiplier": 2.0,
         "observing_mode": "IMAGER",
     }
@@ -211,41 +159,14 @@ def test_set_output_arrays():
 def test_validate_configuration():
     obs = Observation()
 
-    # Missing photometric_aperture_radius and psf_trunc_ratio
     parameters = {
         "wavelength": [0.5, 0.55, 0.6],
         "snr": [7.0, 7.0, 7.0],
-        "CRb_multiplier": 2.0,
-    }
-    with pytest.raises(KeyError):
-        obs.load_configuration(parameters)
-
-    with pytest.raises(AttributeError):
-        obs.validate_configuration()
-
-    # PSF trunc ratio
-    parameters = {
-        "wavelength": [0.5, 0.55, 0.6],
-        "snr": [7.0, 7.0, 7.0],
-        "psf_trunc_ratio": 0.3,
         "CRb_multiplier": 2.0,
         "observing_mode": "IMAGER",
     }
+    obs = Observation()
     obs.load_configuration(parameters)
-
-    # Test valid configuration
-    obs.validate_configuration()  # This should not raise any exception
-
-    # Photap rad
-    parameters = {
-        "wavelength": [0.5, 0.55, 0.6],
-        "snr": [7.0, 7.0, 7.0],
-        "photometric_aperture_radius": 0.7,
-        "CRb_multiplier": 2.0,
-        "observing_mode": "IMAGER",
-    }
-    obs.load_configuration(parameters)
-
     # Test valid configuration
     obs.validate_configuration()  # This should not raise any exception
 

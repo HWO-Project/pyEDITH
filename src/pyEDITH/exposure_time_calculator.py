@@ -764,7 +764,7 @@ def calculate_exposure_time_or_snr(
             det_photometric_aperture_throughput,
             det_omega_lod,
         ) = measure_coronagraph_performance_at_IWA(
-            # observation.psf_trunc_ratio, # this is no longer used in the function
+            # observatory.coronagraph.psf_trunc_ratio, # this is no longer used in the function
             observatory.coronagraph.photometric_aperture_throughput,
             observatory.coronagraph.Istar,
             observatory.coronagraph.skytrans,

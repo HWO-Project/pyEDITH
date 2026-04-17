@@ -270,7 +270,6 @@ def test_print_all_variables(mode):
     mock_observation.td_limit = 24 * u.hour
     mock_observation.CRb_multiplier = 1.0
     mock_observation.fullsnr = [5, 6, 7] * DIMENSIONLESS
-    mock_observation.psf_trunc_ratio = 0.3
     mock_observation.exptime = [1000, 1200, 1400] * u.s
 
     mock_scene.mag = 5.0
@@ -297,6 +296,7 @@ def test_print_all_variables(mode):
     mock_observatory.coronagraph.Istar = np.ones((10, 10)) * 1e-10 * DIMENSIONLESS
     mock_observatory.coronagraph.noisefloor = np.ones((10, 10)) * 1e-11 * DIMENSIONLESS
     mock_observatory.coronagraph.npix = 100
+    mock_observatory.coronagraph.psf_trunc_ratio = 0.3
     mock_observatory.coronagraph.pixscale = 0.1 * u.arcsec / u.pix
     mock_observatory.coronagraph.photometric_aperture_throughput = (
         np.ones((10, 10, 1)) * 0.5 * DIMENSIONLESS

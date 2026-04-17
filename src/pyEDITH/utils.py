@@ -510,7 +510,10 @@ def print_all_variables(
                 ),
                 ("observatory.coronagraph.npix", observatory.coronagraph.npix),
                 ("observatory.coronagraph.pixscale", observatory.coronagraph.pixscale),
-                ("observation.psf_trunc_ratio", observation.psf_trunc_ratio),
+                (
+                    "observatory.coronagraph.psf_trunc_ratio",
+                    observatory.coronagraph.psf_trunc_ratio,
+                ),
                 (
                     "observatory.coronagraph.photometric_aperture_throughput",
                     observatory.coronagraph.photometric_aperture_throughput,

@@ -141,6 +141,10 @@ class Coronagraph(ABC):
         Bandwidth of the coronagraph.
     stellar_angular_diameter : np.ndarray
         Angular diameters of the target objects.
+    photometric_aperture_radius : float
+        Photometric aperture radius (in units of lambda/D).
+    psf_trunc_ratio : np.ndarray
+        PSF truncation ratio.
     npsfratios : int
         Number of PSF ratios.
     nrolls : int
@@ -170,9 +174,9 @@ class Coronagraph(ABC):
         Check that mandatory variables are present and have the correct format.
 
         This method validates that all required attributes exist on the coronagraph
-        object and that they have the expected types and units. Additional variables
-        may be present but are not required for calculations.
-
+        object and that they have the expected types and units.  It specifically
+        verifies that either photometric_aperture_radius or psf_trunc_ratio is
+        defined but not necessarily both.
         Raises
         ------
         AttributeError
@@ -203,6 +207,21 @@ class Coronagraph(ABC):
             "coronagraph_spectral_resolution": DIMENSIONLESS,
         }
 
+        # Either photometric_aperture_radius or psf_trunc_ratio must be present
+        if (
+            hasattr(self, "photometric_aperture_radius")
+            and getattr(self, "photometric_aperture_radius") is not None
+        ):
+            expected_args["photometric_aperture_radius"] = LAMBDA_D
+        elif (
+            hasattr(self, "psf_trunc_ratio")
+            and getattr(self, "psf_trunc_ratio") is not None
+        ):
+            expected_args["psf_trunc_ratio"] = DIMENSIONLESS
+        else:
+            raise AttributeError(
+                "Coronagraph must have either 'photometric_aperture_radius' or 'psf_trunc_ratio' attribute."
+            )
         utils.validate_attributes(self, expected_args)
 
 
@@ -232,6 +251,7 @@ class ToyModelCoronagraph(Coronagraph):
         "noisefloor_factor": 0.03
         * DIMENSIONLESS,  #  1 sigma systematic noise floor expressed as a multiplicative factor to the contrast (unitless)
         "bandwidth": 0.2,  # fractional bandwidth of coronagraph (unitless)
+        "photometric_aperture_radius": 0.85 * LAMBDA_D,
         "Tcore": 0.2968371
         * DIMENSIONLESS,  # core throughput of coronagraph (uniform over dark hole, unitless, scalar)
         "TLyot": 0.65
@@ -276,15 +296,11 @@ class ToyModelCoronagraph(Coronagraph):
             Mediator object providing access to observation and scene parameters
         """
         # Load parameters, use defaults if not provided
-
         utils.fill_parameters(self, parameters, self.DEFAULT_CONFIG)
 
         # Convert to numpy array when appropriate
         array_params = ["coronagraph_optical_throughput"]
         utils.convert_to_numpy_array(self, array_params)
-
-        # Get PSF Truncation ratio from Observation
-        # self.psf_trunc_ratio = mediator.get_observation_parameter("psf_trunc_ratio")
 
         # Derived parameters
         self.npsfratios = 1
@@ -299,12 +315,9 @@ class ToyModelCoronagraph(Coronagraph):
         self.omega_lod = (
             np.full(
                 (self.npix, self.npix, self.npsfratios),
-                float(np.pi)
-                * mediator.get_observation_parameter("photometric_aperture_radius")
-                ** 2,
+                float(np.pi) * self.photometric_aperture_radius**2,
             )
-            * (mediator.get_observation_parameter("photometric_aperture_radius").unit)
-            ** 2
+            * (self.photometric_aperture_radius.unit) ** 2
         )  # size of photometric aperture at all separations (npix,npix,len(psftruncratio))
 
         self.skytrans = (
@@ -466,8 +479,7 @@ class CoronagraphYIP(Coronagraph):
         Raises
         ------
         KeyError
-            If observing mode is not 'IMAGER' or 'IFS', or if neither psf_trunc_ratio
-            nor photometric_aperture_radius are specified
+            If neither psf_trunc_ratio nor photometric_aperture_radius are specified
         AssertionError
             If stellar angular diameter is outside valid bounds (0 <= diameter < 1 λ/D)
         """
@@ -484,7 +496,7 @@ class CoronagraphYIP(Coronagraph):
         instrument_params = load_instrument("CI").__dict__
 
         # averaging over bandpass is only required for imaging mode.
-        if parameters["observing_mode"] == "IMAGER":
+        if mediator.get_observation_parameter("observing_mode") == "IMAGER":
             wavelength_range = [
                 mediator.get_observation_parameter("wavelength")
                 * (1 - 0.5 * self.bandwidth),
@@ -494,12 +506,10 @@ class CoronagraphYIP(Coronagraph):
             instrument_params = utils.average_over_bandpass(
                 instrument_params, wavelength_range
             )
-        elif parameters["observing_mode"] == "IFS":
+        else:  # IFS case
             instrument_params = utils.interpolate_over_bandpass(
                 instrument_params, mediator.get_observation_parameter("wavelength")
             )
-        else:
-            raise KeyError("Invalid observing mode. Must be 'IMAGER' or 'IFS'.")
 
         # Ensure coronagraph_optical_throughput has dimensions nlambda
         if np.isscalar(instrument_params["total_inst_refl"]):
@@ -511,8 +521,31 @@ class CoronagraphYIP(Coronagraph):
                 np.array(instrument_params["total_inst_refl"]) * DIMENSIONLESS
             )
 
+        # Load photometric aperture radius or psf truncation ratio from user. Fail if not provided
+        psf_trunc = parameters.get("psf_trunc_ratio")
+        phot_aperture = parameters.get("photometric_aperture_radius")
+
+        # Check that at least one is provided
+        if psf_trunc is None and phot_aperture is None:
+            raise KeyError(
+                "Either 'photometric_aperture_radius' or 'psf_trunc_ratio' must be provided in the parameters."
+            )
+
+        # Prefer psf_trunc_ratio if both are provided
+        if psf_trunc is not None:
+            self.psf_trunc_ratio = psf_trunc * DIMENSIONLESS
+            if phot_aperture is not None:
+                logger.warning(
+                    "Both 'photometric_aperture_radius' and 'psf_trunc_ratio' provided. "
+                    "Using 'psf_trunc_ratio' and ignoring 'photometric_aperture_radius'."
+                )
+            self.photometric_aperture_radius = None
+        else:
+            self.psf_trunc_ratio = None
+            self.photometric_aperture_radius = phot_aperture * LAMBDA_D
+
         # ***** Load the YIP using yippy *****
-        obs_trunc_ratio = mediator.get_observation_parameter("psf_trunc_ratio")
+        obs_trunc_ratio = self.psf_trunc_ratio
         if obs_trunc_ratio is not None:
             # Strip units so yippy receives a plain float
             obs_trunc_float = float(obs_trunc_ratio)
@@ -554,33 +587,11 @@ class CoronagraphYIP(Coronagraph):
         # Separation grid from yippy (replaces generate_radii)
         self.DEFAULT_CONFIG["r"] = yippy_obj.separation_map() * LAMBDA_D
 
-        self.DEFAULT_CONFIG["npsfratios"] = len(
-            [mediator.get_observation_parameter("psf_trunc_ratio")]
-        )
+        self.DEFAULT_CONFIG["npsfratios"] = len([self.psf_trunc_ratio])
 
-        if (
-            mediator.get_observation_parameter("psf_trunc_ratio") is None
-            and mediator.get_observation_parameter("photometric_aperture_radius")
-            is None
-        ):
-            raise KeyError(
-                "WARNING: Neither psf_trunc_ratio or photometric_aperture_radius "
-                "are specified. Specify one or the other to calculate Omega."
-            )
-        elif mediator.get_observation_parameter("psf_trunc_ratio") is not None:
-            if (
-                mediator.get_observation_parameter("photometric_aperture_radius")
-                is not None
-            ):
-                logger.warning(
-                    "Both psf_trunc_ratio and photometric_aperture_radius are "
-                    "specified. Preferring psf_trunc_ratio going forward..."
-                )
+        if self.psf_trunc_ratio is not None:
+
             logger.info("Using psf_trunc_ratio to calculate Omega...")
-
-            self.DEFAULT_CONFIG["psf_trunc_ratio"] = np.array(
-                [mediator.get_observation_parameter("psf_trunc_ratio")]
-            )
 
             # Throughput and core area from yippy (replaces zoom+threshold+interp)
             omega_lod = yippy_obj.core_area_map()[..., np.newaxis]
@@ -589,9 +600,8 @@ class CoronagraphYIP(Coronagraph):
             ]
 
         elif (
-            mediator.get_observation_parameter("psf_trunc_ratio") is None
-            and mediator.get_observation_parameter("photometric_aperture_radius")
-            is not None
+            self.psf_trunc_ratio is None
+            and self.photometric_aperture_radius is not None
         ):
             logger.info("Using photometric_aperture_radius to calculate Omega...")
 
@@ -613,16 +623,9 @@ class CoronagraphYIP(Coronagraph):
             omega_lod = (
                 np.full(
                     (self.DEFAULT_CONFIG["npix"], self.DEFAULT_CONFIG["npix"], 1),
-                    float(np.pi)
-                    * mediator.get_observation_parameter("photometric_aperture_radius")
-                    ** 2,
+                    float(np.pi) * self.photometric_aperture_radius**2,
                 )
-                * (
-                    mediator.get_observation_parameter(
-                        "photometric_aperture_radius"
-                    ).unit
-                )
-                ** 2
+                * (self.photometric_aperture_radius.unit) ** 2
             )  # size of photometric aperture at all separations (npix,npix,len(psftruncratio))
 
             photometric_aperture_throughput = (

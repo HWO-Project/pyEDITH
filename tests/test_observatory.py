@@ -69,6 +69,8 @@ class MockCoronagraph(Coronagraph):
         self.contrast = 1.05e-13 * DIMENSIONLESS
         self.noisefloor_factor = 0.03 * DIMENSIONLESS
         self.bandwidth = 0.2
+        self.psf_trunc_ratio = 0.3 * DIMENSIONLESS
+        self.photometric_aperture_radius = 0.7 * LAMBDA_D
         self.Tcore = 0.2968371 * DIMENSIONLESS
         self.TLyot = 0.65 * DIMENSIONLESS
         self.nrolls = 1
@@ -151,10 +153,10 @@ def mock_observatory():
 @pytest.fixture
 def mock_observation():
     obs = Observation()
+    obs.observing_mode = "IMAGER"
     obs.td_limit = 1.0e20 * u.s
     obs.wavelength = u.Quantity([0.5], u.micron)
     obs.SNR = u.Quantity([7], DIMENSIONLESS)
-    obs.photometric_aperture_radius = 0.85 * LAMBDA_D
     obs.CRb_multiplier = 2
     obs.nlambd = 1
     obs.tp = 0.0 * u.s

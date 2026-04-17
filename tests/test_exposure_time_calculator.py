@@ -37,8 +37,6 @@ class MockObservation:
         self.wavelength = u.Quantity([0.5], u.micron)
         self.delta_wavelength = u.Quantity([0.5 * 0.2], u.micron)  # 20% bandpass
         self.SNR = u.Quantity([7], DIMENSIONLESS)
-        self.photometric_aperture_radius = 0.85 * LAMBDA_D
-        self.psf_trunc_ratio = 0.3 * DIMENSIONLESS
         self.CRb_multiplier = 2
         self.nlambd = 1
         self.tp = 0.0 * u.s
@@ -111,6 +109,8 @@ class MockObservatory:
         self.coronagraph.contrast = 1.05e-13 * DIMENSIONLESS
         self.coronagraph.noisefloor_factor = 0.03 * DIMENSIONLESS
         self.coronagraph.bandwidth = 0.2
+        self.coronagraph.photometric_aperture_radius = 0.85 * LAMBDA_D
+        self.coronagraph.psf_trunc_ratio = 0.3 * DIMENSIONLESS
         self.coronagraph.Tcore = 0.2968371 * DIMENSIONLESS
         self.coronagraph.TLyot = 0.65 * DIMENSIONLESS
         self.coronagraph.nrolls = 2
