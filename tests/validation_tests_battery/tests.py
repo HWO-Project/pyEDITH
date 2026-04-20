@@ -48,9 +48,7 @@ def process_star(name):
         yippy_logger = logging.getLogger("yippy")
         yippy_logger.setLevel(logging.ERROR)
         # Run pyEDITH calculation
-        texp, validation_output = calculate_texp(
-            input_params, verbose=False, ETC_validation=True
-        )
+        texp, validation_output = calculate_texp(input_params, ETC_validation=True)
 
         # # Compare with Ayo's results
         # compare_with_ayo(
