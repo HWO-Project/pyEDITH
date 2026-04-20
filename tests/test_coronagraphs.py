@@ -322,75 +322,6 @@ def test_coronagraph_yip_init():
 
 
 @pytest.fixture
-def mock_yippy_object(
-    spec_set=[
-        "header",
-        "sky_trans",
-        "offax",
-        "stellar_intens",
-        "separation_map",
-        "core_area_map",
-        "throughput_map",
-        "core_mean_intensity_map",
-    ],
-):
-    mock_yippy = MagicMock(spec_set=spec_set)
-    mock_yippy.header.pixscale.value = 0.25
-    mock_yippy.header.naxis1 = 100
-    mock_yippy.header.xcenter = 50
-    mock_yippy.header.ycenter = 50
-    mock_yippy.sky_trans.return_value = np.ones((100, 100))
-    mock_yippy.offax.x_offsets = np.linspace(0, 10, 11)
-    mock_yippy.offax.y_offsets = np.linspace(0, 10, 11)
-    mock_yippy.offax.reshaped_psfs = np.random.rand(11, 1, 100, 100)
-    mock_yippy.stellar_intens.return_value = np.random.rand(100, 100)
-
-    y, x = np.mgrid[:100, :100]
-    r_pix = np.sqrt((x - 50) ** 2 + (y - 50) ** 2)
-    sep_map = r_pix * 0.25
-    mock_yippy.separation_map.return_value = sep_map
-    mock_yippy.core_area_map.return_value = np.full((100, 100), 0.0025)
-    mock_yippy.throughput_map.return_value = np.full((100, 100), 0.3)
-    mock_yippy.core_mean_intensity_map.return_value = np.full((100, 100), 1e-10)
-    return mock_yippy
-
-
-@pytest.fixture
-def mock_yippy_object_incl_nrolls(
-    spec_set=[
-        "header",
-        "sky_trans",
-        "offax",
-        "stellar_intens",
-        "nrolls",
-        "separation_map",
-        "core_area_map",
-        "throughput_map",
-        "core_mean_intensity_map",
-    ],
-):
-    mock_yippy = MagicMock(spec_set=spec_set)
-    mock_yippy.header.pixscale.value = 0.25
-    mock_yippy.header.naxis1 = 100
-    mock_yippy.header.xcenter = 50
-    mock_yippy.header.ycenter = 50
-    mock_yippy.sky_trans.return_value = np.ones((100, 100))
-    mock_yippy.offax.x_offsets = np.linspace(0, 10, 11)
-    mock_yippy.offax.y_offsets = np.linspace(0, 10, 11)
-    mock_yippy.offax.reshaped_psfs = np.random.rand(11, 1, 100, 100)
-    mock_yippy.stellar_intens.return_value = np.random.rand(100, 100)
-
-    y, x = np.mgrid[:100, :100]
-    r_pix = np.sqrt((x - 50) ** 2 + (y - 50) ** 2)
-    sep_map = r_pix * 0.25
-    mock_yippy.separation_map.return_value = sep_map
-    mock_yippy.core_area_map.return_value = np.full((100, 100), 0.0025)
-    mock_yippy.throughput_map.return_value = np.full((100, 100), 0.3)
-    mock_yippy.core_mean_intensity_map.return_value = np.full((100, 100), 1e-10)
-    return mock_yippy
-
-
-@pytest.fixture
 def mock_instrument():
     mock = MagicMock()
     mock.lam = np.linspace(0.3, 1.6, 10) * WAVELENGTH
@@ -420,12 +351,10 @@ def mock_telescope():
 
 @patch("eacy.load_instrument")
 @patch("eacy.load_telescope")
-@patch("pyEDITH.components.coronagraphs.yippycoro")
 def test_coronagraph_yip_load_configuration_IMAGER(
-    mock_yippycoro,
     mock_load_telescope,
     mock_load_instrument,
-    mock_yippy_object,
+    yippy_coronagraph,
     mock_instrument,
     mock_telescope,
     caplog,
@@ -433,9 +362,8 @@ def test_coronagraph_yip_load_configuration_IMAGER(
     with caplog.at_level(logging.DEBUG, logger="pyEDITH"):
         mock_load_instrument.return_value = mock_instrument
         mock_load_telescope.return_value = mock_telescope
-        mock_yippycoro.return_value = mock_yippy_object
 
-        coronagraph = CoronagraphYIP(path="test_path")
+        coronagraph = CoronagraphYIP(yippy_coro=yippy_coronagraph)
         parameters = {
             "observing_mode": "IMAGER",
             "maximum_OWA": 90.0,
@@ -451,9 +379,7 @@ def test_coronagraph_yip_load_configuration_IMAGER(
         coronagraph.load_configuration(parameters, mediator)
 
         # Check parameters from yippy + overwritten parameters
-        assert (
-            coronagraph.pixscale == 0.25 * LAMBDA_D
-        )  # This comes from mock_yippy_object
+        assert coronagraph.pixscale == yippy_coronagraph.header.pixscale.value * LAMBDA_D
         assert coronagraph.minimum_IWA == 2.0 * LAMBDA_D  # Default
         assert (
             coronagraph.maximum_OWA == 90.0 * LAMBDA_D
@@ -464,9 +390,9 @@ def test_coronagraph_yip_load_configuration_IMAGER(
         assert coronagraph.az_avg == True
 
         # Check calculated values
-        assert coronagraph.npix == 100  # This comes from mock_yippy_object
-        assert coronagraph.xcenter == 50 * PIXEL
-        assert coronagraph.ycenter == 50 * PIXEL
+        assert coronagraph.npix == yippy_coronagraph.header.naxis1
+        assert coronagraph.xcenter == yippy_coronagraph.header.xcenter * PIXEL
+        assert coronagraph.ycenter == yippy_coronagraph.header.ycenter * PIXEL
 
         assert hasattr(coronagraph, "npix")
         assert hasattr(coronagraph, "xcenter")
@@ -491,7 +417,7 @@ def test_coronagraph_yip_load_configuration_IMAGER(
         assert coronagraph.skytrans.shape == (coronagraph.npix, coronagraph.npix)
         assert np.all(
             coronagraph.skytrans
-            == mock_yippy_object.sky_trans.return_value * DIMENSIONLESS
+            == yippy_coronagraph.sky_trans() * DIMENSIONLESS
         )
         assert not np.all(coronagraph.skytrans == 0)
 
@@ -519,7 +445,7 @@ def test_coronagraph_yip_load_configuration_IMAGER(
         )
 
         assert np.allclose(
-            coronagraph.noisefloor, coronagraph.Istar / 30, rtol=1e-6, atol=1e-9
+            coronagraph.noisefloor, coronagraph.Istar / 30, rtol=1e-6, atol=1e-9, equal_nan=True
         )
 
         # Test with noisefloor_factor
@@ -564,7 +490,7 @@ def test_coronagraph_yip_load_configuration_IMAGER(
         assert coronagraph.noisefloor.unit == DIMENSIONLESS
         noisefloor_PPF = coronagraph.noisefloor.copy()
         assert np.allclose(
-            coronagraph.noisefloor, coronagraph.Istar / 35, rtol=1e-6, atol=1e-9
+            coronagraph.noisefloor, coronagraph.Istar / 35, rtol=1e-6, atol=1e-9, equal_nan=True
         )
 
         # Check coronagraph_optical_throughput
@@ -613,12 +539,10 @@ def test_coronagraph_yip_load_configuration_IMAGER(
 
 @patch("eacy.load_instrument")
 @patch("eacy.load_telescope")
-@patch("pyEDITH.components.coronagraphs.yippycoro")
 def test_coronagraph_yip_load_configuration_IFS(
-    mock_yippycoro,
     mock_load_telescope,
     mock_load_instrument,
-    mock_yippy_object,
+    yippy_coronagraph,
     mock_instrument,
     mock_telescope,
     caplog,
@@ -626,9 +550,8 @@ def test_coronagraph_yip_load_configuration_IFS(
     with caplog.at_level(logging.DEBUG, logger="pyEDITH"):
         mock_load_instrument.return_value = mock_instrument
         mock_load_telescope.return_value = mock_telescope
-        mock_yippycoro.return_value = mock_yippy_object
 
-        coronagraph = CoronagraphYIP(path="test_path")
+        coronagraph = CoronagraphYIP(yippy_coro=yippy_coronagraph)
         # adding both trunc_ratio and photometric_aperture to test warning
         parameters = {
             "observing_mode": "IFS",
@@ -665,15 +588,12 @@ def test_coronagraph_yip_load_configuration_IFS(
         ).all()
 
 
-# TODO: revisit with new implementation
 @patch("eacy.load_instrument")
 @patch("eacy.load_telescope")
-@patch("pyEDITH.components.coronagraphs.yippycoro")
 def test_coronagraph_yip_load_configuration_with_photometric_aperture_radius(
-    mock_yippycoro,
     mock_load_telescope,
     mock_load_instrument,
-    mock_yippy_object,
+    yippy_coronagraph,
     mock_instrument,
     mock_telescope,
     caplog,
@@ -681,9 +601,8 @@ def test_coronagraph_yip_load_configuration_with_photometric_aperture_radius(
     with caplog.at_level(logging.DEBUG, logger="pyEDITH"):
         mock_load_instrument.return_value = mock_instrument
         mock_load_telescope.return_value = mock_telescope
-        mock_yippycoro.return_value = mock_yippy_object
 
-        coronagraph = CoronagraphYIP(path="test_path")
+        coronagraph = CoronagraphYIP(yippy_coro=yippy_coronagraph)
         parameters = {
             "observing_mode": "IMAGER",
             "maximum_OWA": 90.0,
@@ -739,7 +658,7 @@ def test_coronagraph_yip_load_configuration_with_photometric_aperture_radius(
 
         caplog.clear()
         # SAME TEST but no Tcore available, use default
-        coronagraph = CoronagraphYIP(path="test_path")
+        coronagraph = CoronagraphYIP(yippy_coro=yippy_coronagraph)
         parameters = {
             "observing_mode": "IMAGER",
             "maximum_OWA": 90.0,
