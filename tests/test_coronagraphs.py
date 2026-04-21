@@ -852,7 +852,7 @@ def test_coronagraph_yip_nrolls_from_yippy(
     mock_load_instrument.return_value = mock_instrument
     mock_load_telescope.return_value = mock_telescope
 
-    monkeypatch.setattr(yippy_coronagraph, "nrolls", 2, raising=False)
+    monkeypatch.setattr(yippy_coronagraph, "nrolls", 4, raising=False)
 
     coronagraph = CoronagraphYIP(yippy_coro=yippy_coronagraph)
     parameters = {
@@ -866,7 +866,7 @@ def test_coronagraph_yip_nrolls_from_yippy(
     }
     coronagraph.load_configuration(parameters, MockMediator_IMAGER())
 
-    assert coronagraph.DEFAULT_CONFIG["nrolls"] == 2
+    assert coronagraph.DEFAULT_CONFIG["nrolls"] == 4
 
 
 @patch("eacy.load_instrument")
