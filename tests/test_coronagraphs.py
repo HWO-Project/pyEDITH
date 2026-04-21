@@ -866,7 +866,7 @@ def test_coronagraph_yip_nrolls_from_yippy(
     }
     coronagraph.load_configuration(parameters, MockMediator_IMAGER())
 
-    assert coronagraph.DEFAULT_CONFIG["nrolls"] == 4
+    assert coronagraph.DEFAULT_CONFIG["nrolls"] == 2
 
 
 @patch("eacy.load_instrument")
