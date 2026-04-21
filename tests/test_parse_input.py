@@ -435,7 +435,7 @@ def test_parse_parameters_wavelength_dependent_mismatched_length():
         parse_parameters({"wavelength": wavelengths, "snr": [10, 20]})
 
 
-def test_parse_parameters_wavelength_dependent_excess_length(caplog):
+def test_parse_parameters_wavelength_dependent_excess_length_scalar(caplog):
     """Test that excess length triggers warning and uses first value."""
     with caplog.at_level(logging.DEBUG, logger="pyEDITH"):
         parsed = parse_parameters({"wavelength": 0.5, "snr": [10, 20, 30]})
@@ -446,15 +446,35 @@ def test_parse_parameters_wavelength_dependent_excess_length(caplog):
         for record in caplog.records
         if record.levelno == logging.WARNING
     )
+    assert parsed["snr"] == np.array([10])
+
+
+def test_parse_parameters_wavelength_dependent_excess_length_quantity(caplog):
+    """Test that excess length triggers warning and uses first value."""
+    with caplog.at_level(logging.DEBUG, logger="pyEDITH"):
+        parsed = parse_parameters(
+            {"wavelength": 0.5, "DC": [10, 20, 30] * DARK_CURRENT}
+        )
+
+    assert any(
+        "DC should be a list of length 1 but you assigned multiple values"
+        in record.message
+        for record in caplog.records
+        if record.levelno == logging.WARNING
+    )
+    assert parsed["DC"] == np.array([10]) * DARK_CURRENT
+    assert isinstance(parsed["DC"], u.Quantity)
 
 
 def test_parse_parameters_wavelength_dependent_with_quantity():
     """Test wavelength-dependent parameters with Quantity input."""
     wavelengths = [0.5, 0.6, 0.7]
 
-    parsed = parse_parameters({"wavelength": wavelengths, "snr": 1.5 * u.m})
+    parsed = parse_parameters(
+        {"wavelength": wavelengths, "snr": 1.5 * u.dimensionless_unscaled}
+    )
 
-    assert np.all(parsed["snr"] == np.array([1.5, 1.5, 1.5]) * u.m)
+    assert np.all(parsed["snr"] == np.array([1.5, 1.5, 1.5]) * u.dimensionless_unscaled)
     assert isinstance(parsed["snr"], u.Quantity)
 
 
