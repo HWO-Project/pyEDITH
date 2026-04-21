@@ -777,3 +777,122 @@ def test_coronagraph_yip_load_configuration_with_yippy_coro(
             for record in caplog.records
             if record.levelno == logging.WARNING
         )
+
+
+def test_validate_configuration_missing_aperture():
+    """validate_configuration covers psf_trunc_ratio-only path and raises when neither is set."""
+    coronagraph = ToyModelCoronagraph()
+    coronagraph.Istar = np.ones((100, 100)) * DIMENSIONLESS
+    coronagraph.noisefloor = np.ones((100, 100)) * DIMENSIONLESS
+    coronagraph.photometric_aperture_throughput = np.ones((100, 100, 1)) * DIMENSIONLESS
+    coronagraph.omega_lod = np.ones((100, 100, 1)) * LAMBDA_D**2
+    coronagraph.skytrans = np.ones((100, 100)) * DIMENSIONLESS
+    coronagraph.pixscale = 0.1 * LAMBDA_D
+    coronagraph.npix = 100
+    coronagraph.xcenter = 50 * PIXEL
+    coronagraph.ycenter = 50 * PIXEL
+    coronagraph.bandwidth = 0.1
+    coronagraph.npsfratios = 1
+    coronagraph.nrolls = 1
+    coronagraph.nchannels = 1
+    coronagraph.minimum_IWA = 2 * LAMBDA_D
+    coronagraph.maximum_OWA = 10 * LAMBDA_D
+    coronagraph.coronagraph_optical_throughput = np.array([0.5]) * DIMENSIONLESS
+    coronagraph.coronagraph_spectral_resolution = 1 * DIMENSIONLESS
+
+    coronagraph.psf_trunc_ratio = 0.3 * DIMENSIONLESS
+    coronagraph.validate_configuration()
+
+    delattr(coronagraph, "psf_trunc_ratio")
+    with pytest.raises(AttributeError, match="photometric_aperture_radius"):
+        coronagraph.validate_configuration()
+
+
+@patch("eacy.load_instrument")
+@patch("eacy.load_telescope")
+def test_coronagraph_yip_load_configuration_with_path(
+    mock_load_telescope,
+    mock_load_instrument,
+    mock_instrument,
+    mock_telescope,
+    coronagraph_path,
+):
+    """CoronagraphYIP constructed from a path calls yippycoro() directly."""
+    mock_load_instrument.return_value = mock_instrument
+    mock_load_telescope.return_value = mock_telescope
+
+    coronagraph = CoronagraphYIP(path=coronagraph_path)
+    parameters = {
+        "observing_mode": "IMAGER",
+        "maximum_OWA": 90.0,
+        "bandwidth": 0.1,
+        "psf_trunc_ratio": 0.3,
+        "nrolls": 2,
+        "nchannels": 1,
+        "az_avg": True,
+    }
+    mediator = MockMediator_IMAGER()
+    coronagraph.load_configuration(parameters, mediator)
+
+    assert coronagraph.npix > 0
+    assert hasattr(coronagraph, "Istar")
+
+
+@patch("eacy.load_instrument")
+@patch("eacy.load_telescope")
+def test_coronagraph_yip_nrolls_from_yippy(
+    mock_load_telescope,
+    mock_load_instrument,
+    mock_instrument,
+    mock_telescope,
+    yippy_coronagraph,
+    monkeypatch,
+):
+    """nrolls is read from yippy_obj when the attribute exists."""
+    mock_load_instrument.return_value = mock_instrument
+    mock_load_telescope.return_value = mock_telescope
+
+    monkeypatch.setattr(yippy_coronagraph, "nrolls", 2, raising=False)
+
+    coronagraph = CoronagraphYIP(yippy_coro=yippy_coronagraph)
+    parameters = {
+        "observing_mode": "IMAGER",
+        "maximum_OWA": 90.0,
+        "bandwidth": 0.1,
+        "psf_trunc_ratio": 0.3,
+        "nrolls": 2,
+        "nchannels": 1,
+        "az_avg": True,
+    }
+    coronagraph.load_configuration(parameters, MockMediator_IMAGER())
+
+    assert coronagraph.DEFAULT_CONFIG["nrolls"] == 4
+
+
+@patch("eacy.load_instrument")
+@patch("eacy.load_telescope")
+def test_coronagraph_yip_az_avg_false(
+    mock_load_telescope,
+    mock_load_instrument,
+    mock_instrument,
+    mock_telescope,
+    yippy_coronagraph,
+):
+    """az_avg=False uses the full 2D stellar intensity map."""
+    mock_load_instrument.return_value = mock_instrument
+    mock_load_telescope.return_value = mock_telescope
+
+    coronagraph = CoronagraphYIP(yippy_coro=yippy_coronagraph)
+    coronagraph.DEFAULT_CONFIG["az_avg"] = False
+    parameters = {
+        "observing_mode": "IMAGER",
+        "maximum_OWA": 90.0,
+        "bandwidth": 0.1,
+        "psf_trunc_ratio": 0.3,
+        "nrolls": 2,
+        "nchannels": 1,
+        "az_avg": False,
+    }
+    coronagraph.load_configuration(parameters, MockMediator_IMAGER())
+
+    assert hasattr(coronagraph, "Istar")
