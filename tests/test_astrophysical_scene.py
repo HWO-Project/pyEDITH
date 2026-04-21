@@ -25,185 +25,294 @@ from pyEDITH.astrophysical_scene import (
 import logging
 
 
-# Test calc_flux_zero_point function
-def test_calc_flux_zero_point(caplog):
+# ============================================================================
+# Tests for calc_flux_zero_point
+# ============================================================================
+
+
+def test_calc_flux_zero_point_default_units():
+    """Test that default output has correct photon flux density units."""
     wavelength = 500 * u.nm
     f0 = calc_flux_zero_point(wavelength)
+
     assert isinstance(f0, u.Quantity)
     assert f0.unit.is_equivalent(u.photon * u.s**-1 * u.cm**-2 * u.Hz**-1)
 
-    # check various output units
-    f0_pcgs = calc_flux_zero_point(wavelength, output_unit="pcgs")
-    assert f0_pcgs.unit.is_equivalent(u.photon * u.s**-1 * u.cm**-2 * u.Hz**-1)
 
-    f0_cgs = calc_flux_zero_point(wavelength, output_unit="cgs")
-    assert f0_cgs.unit.is_equivalent(SPECTRAL_FLUX_DENSITY_CGS)
+@pytest.mark.parametrize(
+    "output_unit,expected_unit",
+    [
+        ("pcgs", u.photon * u.s**-1 * u.cm**-2 * u.Hz**-1),
+        ("cgs", SPECTRAL_FLUX_DENSITY_CGS),
+        ("jy", u.Jy),
+    ],
+)
+def test_calc_flux_zero_point_output_units(output_unit, expected_unit):
+    """Test various output unit conversions."""
+    wavelength = 500 * u.nm
+    f0 = calc_flux_zero_point(wavelength, output_unit=output_unit)
+    assert f0.unit.is_equivalent(expected_unit)
 
-    f0_jy = calc_flux_zero_point(wavelength, output_unit="jy")
-    assert f0_jy.unit.is_equivalent(u.Jy)
 
-    # check perlambd flag
+def test_calc_flux_zero_point_perlambd_pcgs():
+    """Test per-wavelength vs per-frequency output for photon CGS units."""
+    wavelength = 500 * u.nm
+
     f0_freq = calc_flux_zero_point(wavelength, output_unit="pcgs", perlambd=False)
     f0_wave = calc_flux_zero_point(wavelength, output_unit="pcgs", perlambd=True)
 
     assert f0_freq.unit != f0_wave.unit
     assert f0_wave.unit.is_equivalent(PHOTON_FLUX_DENSITY)
 
-    # check perlambd flag cgs version
+
+def test_calc_flux_zero_point_perlambd_cgs():
+    """Test per-wavelength vs per-frequency output for energy CGS units."""
+    wavelength = 500 * u.nm
+
     f0_freq = calc_flux_zero_point(wavelength, output_unit="cgs", perlambd=False)
     f0_wave = calc_flux_zero_point(wavelength, output_unit="cgs", perlambd=True)
 
     assert f0_freq.unit != f0_wave.unit
     assert f0_wave.unit.is_equivalent(u.erg / (u.s * u.cm**3))
 
-    # check AB system
+
+def test_calc_flux_zero_point_ab_vs_johnson():
+    """Test AB magnitude system produces correct zero point vs Johnson."""
+    wavelength = 500 * u.nm
+
     f0_johnson = calc_flux_zero_point(wavelength, output_unit="jy", AB=False)
     f0_ab = calc_flux_zero_point(wavelength, output_unit="jy", AB=True)
 
     assert np.isclose(f0_ab.value, 3631, rtol=1e-6)
     assert f0_johnson.value != f0_ab.value
 
-    # test invalid output string
-    with pytest.raises(ValueError):
-        calc_flux_zero_point(wavelength, output_unit="invalid")
 
-    # test error Jy+perlambd
-    with pytest.raises(ValueError):
-        calc_flux_zero_point(wavelength, output_unit="jy", perlambd=True)
-
-    # test logs
-    caplog.clear()  # Clear any previous logs
-    with caplog.at_level(logging.DEBUG, logger="pyEDITH"):
-        f0 = calc_flux_zero_point(wavelength)
-        assert any(
-            "Flux zero point calculated" in record.message
-            for record in caplog.records
-            if record.levelno == logging.INFO
-        )
-
-    # test array shaped wavelengths
+def test_calc_flux_zero_point_array_wavelengths():
+    """Test calculation with array of wavelengths returns correct shape."""
     wavelengths = np.array([0.3, 0.5, 1, 5]) * WAVELENGTH
 
     f0_array = calc_flux_zero_point(wavelengths, output_unit="pcgs", perlambd=True)
+
     assert isinstance(f0_array, u.Quantity)
     assert f0_array.shape == wavelengths.shape
     assert f0_array.unit.is_equivalent(PHOTON_FLUX_DENSITY)
 
 
-def test_calc_exozodi_flux():
-    # Basic setup
+def test_calc_flux_zero_point_invalid_output_unit():
+    """Test that invalid output unit string raises ValueError."""
+    wavelength = 500 * u.nm
+
+    with pytest.raises(ValueError):
+        calc_flux_zero_point(wavelength, output_unit="invalid")
+
+
+def test_calc_flux_zero_point_jy_with_perlambd_raises():
+    """Test that Jansky output with per-wavelength flag raises ValueError."""
+    wavelength = 500 * u.nm
+
+    with pytest.raises(ValueError):
+        calc_flux_zero_point(wavelength, output_unit="jy", perlambd=True)
+
+
+def test_calc_flux_zero_point_logs_calculation(caplog):
+    """Test that flux zero point calculation is logged at INFO level."""
+    wavelength = 500 * u.nm
+
+    caplog.clear()
+    with caplog.at_level(logging.INFO, logger="pyEDITH"):
+        calc_flux_zero_point(wavelength)
+        assert any(
+            "Flux zero point calculated" in record.message for record in caplog.records
+        )
+
+
+# ============================================================================
+# Tests for calc_exozodi_flux
+# ============================================================================
+
+
+def test_calc_exozodi_flux_basic_calculation():
+    """Test basic exozodi flux calculation returns expected values and units."""
     M_V = 5 * MAGNITUDE
     vmag = 6 * MAGNITUDE
     nexozodis = 1 * ZODI
     lambd = np.array([0.5, 0.6, 0.7]) * WAVELENGTH
     lambdmag = np.array([6, 5.9, 5.8]) * MAGNITUDE
 
-    # Test basic functionality
     exozodi_flux = calc_exozodi_flux(M_V, vmag, nexozodis, lambd, lambdmag)
+
     assert isinstance(exozodi_flux, u.Quantity)
     assert exozodi_flux.unit.is_equivalent(INV_SQUARE_ARCSEC)
     assert len(exozodi_flux) == len(lambd)
 
-    # Test single wavelength (one-dimensional array)
-    single_flux = calc_exozodi_flux(
-        M_V, vmag, nexozodis, u.Quantity([lambd[0]]), u.Quantity([lambdmag[0]])
-    )
+
+def test_calc_exozodi_flux_single_wavelength():
+    """Test exozodi flux calculation with single wavelength."""
+    M_V = 5 * MAGNITUDE
+    vmag = 6 * MAGNITUDE
+    nexozodis = 1 * ZODI
+    lambd = np.array([0.5]) * WAVELENGTH
+    lambdmag = np.array([6]) * MAGNITUDE
+
+    single_flux = calc_exozodi_flux(M_V, vmag, nexozodis, lambd, lambdmag)
+
     assert isinstance(single_flux, u.Quantity)
     assert single_flux.unit.is_equivalent(INV_SQUARE_ARCSEC)
     assert len(single_flux) == 1
 
-    # Test multiple zodi
-    multi_zodi_flux = calc_exozodi_flux(M_V, vmag, 3 * ZODI, lambd, lambdmag)
-    assert np.allclose(multi_zodi_flux.value, 3 * exozodi_flux.value)
 
-    # Test zero zodi
+def test_calc_exozodi_flux_scales_linearly():
+    """Test that exozodi flux scales linearly with number of zodis."""
+    M_V = 5 * MAGNITUDE
+    vmag = 6 * MAGNITUDE
+    lambd = np.array([0.5, 0.6, 0.7]) * WAVELENGTH
+    lambdmag = np.array([6, 5.9, 5.8]) * MAGNITUDE
+
+    flux_1zodi = calc_exozodi_flux(M_V, vmag, 1 * ZODI, lambd, lambdmag)
+    flux_3zodi = calc_exozodi_flux(M_V, vmag, 3 * ZODI, lambd, lambdmag)
+
+    assert np.allclose(flux_3zodi.value, 3 * flux_1zodi.value)
+
+
+def test_calc_exozodi_flux_zero_zodi():
+    """Test that zero zodis produces zero flux."""
+    M_V = 5 * MAGNITUDE
+    vmag = 6 * MAGNITUDE
+    lambd = np.array([0.5, 0.6, 0.7]) * WAVELENGTH
+    lambdmag = np.array([6, 5.9, 5.8]) * MAGNITUDE
+
     zero_flux = calc_exozodi_flux(M_V, vmag, 0 * ZODI, lambd, lambdmag)
+
     assert np.all(zero_flux.value == 0)
 
-    # Test input validation
-    with pytest.raises(ValueError):
-        calc_exozodi_flux(
-            M_V, vmag, nexozodis, lambd, lambdmag[:-1]
-        )  # Mismatched length
 
-    # Test units
+def test_calc_exozodi_flux_mismatched_array_lengths():
+    """Test that mismatched wavelength and magnitude arrays raise ValueError."""
+    M_V = 5 * MAGNITUDE
+    vmag = 6 * MAGNITUDE
+    nexozodis = 1 * ZODI
+    lambd = np.array([0.5, 0.6, 0.7]) * WAVELENGTH
+    lambdmag = np.array([6, 5.9]) * MAGNITUDE  # Intentionally shorter
+
+    with pytest.raises(ValueError):
+        calc_exozodi_flux(M_V, vmag, nexozodis, lambd, lambdmag)
+
+
+def test_calc_exozodi_flux_unit_conversion():
+    """Test that flux can be converted to dimensionless units."""
+    M_V = 5 * MAGNITUDE
+    vmag = 6 * MAGNITUDE
+    nexozodis = 1 * ZODI
+    lambd = np.array([0.5, 0.6, 0.7]) * WAVELENGTH
+    lambdmag = np.array([6, 5.9, 5.8]) * MAGNITUDE
+
+    exozodi_flux = calc_exozodi_flux(M_V, vmag, nexozodis, lambd, lambdmag)
     flux_dimensionless = exozodi_flux.to(
         DIMENSIONLESS, equivalencies=u.dimensionless_angles()
     )
+
     assert isinstance(flux_dimensionless, u.Quantity)
     assert flux_dimensionless.unit == DIMENSIONLESS
 
-    # Test: real values
+
+def test_calc_exozodi_flux_realistic_values():
+    """Test exozodi flux calculation with realistic astrophysical values."""
     M_V = 4.144 * MAGNITUDE
     vmag = 5.444 * MAGNITUDE
     nexozodis = 3 * ZODI
     lambd = np.array([0.5]) * WAVELENGTH
     lambdmag = np.array([5.687]) * MAGNITUDE
 
-    # Test basic functionality
     exozodi_flux = calc_exozodi_flux(M_V, vmag, nexozodis, lambd, lambdmag)
+
     assert np.all(exozodi_flux.value > 0)
     assert np.isclose(exozodi_flux.value, 7.149e-09)
 
 
-def test_astrophysical_scene_initialization():
-    scene = AstrophysicalScene()
-    assert hasattr(scene, "F0V")
-    assert np.isclose(scene.F0V.value, 10374.996)
-    assert scene.F0V.unit == PHOTON_FLUX_DENSITY
+# ============================================================================
+# Tests for calc_zodi_flux
+# ============================================================================
 
 
-def test_calc_zodi_flux():
-    # Basic setup
+def test_calc_zodi_flux_basic_calculation():
+    """Test basic zodiacal flux calculation returns expected values and units."""
     dec = 45 * DEG
     ra = 180 * DEG
     lambd = np.array([0.5, 1]) * WAVELENGTH
     F0 = np.array([13476, 3.82e03]) * PHOTON_FLUX_DENSITY
 
-    # Test basic functionality
     zodi_flux = calc_zodi_flux(dec, ra, lambd, F0)
+
     assert isinstance(zodi_flux, u.Quantity)
     assert zodi_flux.unit.is_equivalent(INV_SQUARE_ARCSEC)
     assert len(zodi_flux) == len(lambd)
 
-    # Test single wavelength (one-dimensional array)
-    single_flux = calc_zodi_flux(dec, ra, u.Quantity([lambd[0]]), u.Quantity([F0[0]]))
+
+def test_calc_zodi_flux_single_wavelength():
+    """Test zodiacal flux calculation with single wavelength."""
+    dec = 45 * DEG
+    ra = 180 * DEG
+    lambd = np.array([0.5]) * WAVELENGTH
+    F0 = np.array([13476]) * PHOTON_FLUX_DENSITY
+
+    single_flux = calc_zodi_flux(dec, ra, lambd, F0)
+
     assert isinstance(single_flux, u.Quantity)
     assert single_flux.unit.is_equivalent(INV_SQUARE_ARCSEC)
     assert len(single_flux) == 1
 
-    # Test units
+
+def test_calc_zodi_flux_unit_conversion():
+    """Test that zodiacal flux can be converted to dimensionless units."""
+    dec = 45 * DEG
+    ra = 180 * DEG
+    lambd = np.array([0.5, 1]) * WAVELENGTH
+    F0 = np.array([13476, 3.82e03]) * PHOTON_FLUX_DENSITY
+
+    zodi_flux = calc_zodi_flux(dec, ra, lambd, F0)
     flux_dimensionless = zodi_flux.to(
         DIMENSIONLESS, equivalencies=u.dimensionless_angles()
     )
+
     assert isinstance(flux_dimensionless, u.Quantity)
     assert flux_dimensionless.unit == DIMENSIONLESS
 
-    # Test starshade mode
-    # with pytest.raises(ValueError):
-    #     calc_zodi_flux(dec, ra, lambd, F0, starshade=True)  # Missing ss_elongation
 
-    # with pytest.raises(ValueError):
-    #     calc_zodi_flux(
-    #         dec, ra, lambd, F0, starshade=False, ss_elongation=45 * DEG
-    #     )  # Inconsistent starshade mode
-
-    # Test: real values    print(ra, dec, lambd, F0, flux_zodi)
-
+def test_calc_zodi_flux_realistic_values():
+    """Test zodiacal flux calculation with realistic sky coordinates."""
     dec = 79.5648101633 * DEG
     ra = 101.5589542028 * DEG
     lambd = np.array([0.5]) * WAVELENGTH
     F0 = np.array([13400]) * PHOTON_FLUX_DENSITY
 
     zodi_flux = calc_zodi_flux(dec, ra, lambd, F0)
+
     assert np.all(zodi_flux.value > 0)
     assert np.isclose(zodi_flux.value, 3.52136205e-10, rtol=1e-4)
 
 
-def test_astrophysical_scene_load_configuration(caplog):
+# ============================================================================
+# Tests for AstrophysicalScene initialization
+# ============================================================================
+
+
+def test_astrophysical_scene_initialization():
+    """Test AstrophysicalScene initializes with correct F0V value."""
     scene = AstrophysicalScene()
 
-    # Test with magnitude inputs
+    assert hasattr(scene, "F0V")
+    assert np.isclose(scene.F0V.value, 10374.996)
+    assert scene.F0V.unit == PHOTON_FLUX_DENSITY
+
+
+# ============================================================================
+# Tests for AstrophysicalScene.load_configuration
+# ============================================================================
+
+
+def test_load_configuration_with_magnitudes():
+    """Test loading configuration with magnitude-based inputs."""
+    scene = AstrophysicalScene()
     parameters = {
         "wavelength": [0.5, 0.55],
         "distance": 10,
@@ -217,6 +326,7 @@ def test_astrophysical_scene_load_configuration(caplog):
         "delta_mag": 20.0,
         "delta_mag_min": 25,
     }
+
     scene.load_configuration(parameters)
 
     assert scene.dist == 10 * DISTANCE
@@ -228,37 +338,106 @@ def test_astrophysical_scene_load_configuration(caplog):
     assert scene.separation == 0.1 * ARCSEC
     assert scene.deltamag == 20.0 * MAGNITUDE
     assert scene.min_deltamag == 25.0 * MAGNITUDE
+
+
+def test_load_configuration_magnitude_array_handling():
+    """Test that magnitude arrays are properly loaded and converted."""
+    scene = AstrophysicalScene()
+    parameters = {
+        "wavelength": [0.5, 0.55],
+        "distance": 10,
+        "magV": 5.0,
+        "mag": [5.1, 5.2],
+        "stellar_radius": 1,
+        "nzodis": 3.0,
+        "ra": 180.0,
+        "dec": 0.0,
+        "separation": 0.1,
+        "delta_mag": 20.0,
+        "delta_mag_min": 25,
+    }
+
+    scene.load_configuration(parameters)
+
     assert isinstance(scene.mag, u.Quantity)
     assert len(scene.mag) == 2
     assert scene.mag.unit == MAGNITUDE
     assert np.allclose(scene.mag.value, [5.1, 5.2])
-
-    # Test Fs_over_F0 calculation
     assert np.allclose(scene.Fs_over_F0.value, 10 ** (-0.4 * np.array([5.1, 5.2])))
 
-    # Test case where F0 was provided
-    parameters["F0"] = 13400
+
+def test_load_configuration_with_custom_F0():
+    """Test loading configuration with custom F0 value."""
+    scene = AstrophysicalScene()
+    parameters = {
+        "wavelength": [0.5, 0.55],
+        "distance": 10,
+        "magV": 5.0,
+        "mag": [5.1, 5.2],
+        "stellar_radius": 1,
+        "nzodis": 3.0,
+        "ra": 180.0,
+        "dec": 0.0,
+        "separation": 0.1,
+        "delta_mag": 20.0,
+        "delta_mag_min": 25,
+        "F0": 13400,
+    }
+
     scene.load_configuration(parameters)
+
     assert scene.F0 == parameters["F0"] * PHOTON_FLUX_DENSITY
 
-    # Test with semimajor_axis instead of separation
-    semimajor_axis_parameters = parameters.copy()
-    del semimajor_axis_parameters["separation"]
-    semimajor_axis_parameters["semimajor_axis"] = 1.0  # 1 AU
-    scene.load_configuration(semimajor_axis_parameters)
+
+def test_load_configuration_with_semimajor_axis():
+    """Test loading configuration using semimajor_axis instead of separation."""
+    scene = AstrophysicalScene()
+    parameters = {
+        "wavelength": [0.5, 0.55],
+        "distance": 10,
+        "magV": 5.0,
+        "mag": [5.1, 5.2],
+        "stellar_radius": 1,
+        "nzodis": 3.0,
+        "ra": 180.0,
+        "dec": 0.0,
+        "semimajor_axis": 1.0,  # 1 AU
+        "delta_mag": 20.0,
+        "delta_mag_min": 25,
+    }
+
+    scene.load_configuration(parameters)
+
     assert np.isclose(scene.separation.value, 0.1)  # definition of parsec
     assert scene.separation.unit == ARCSEC
 
-    # Test when neither separation nor semimajor_axis is provided
-    invalid_parameters = parameters.copy()
-    del invalid_parameters["separation"]
+
+def test_load_configuration_missing_separation_and_semimajor_axis():
+    """Test that missing both separation and semimajor_axis raises ValueError."""
+    scene = AstrophysicalScene()
+    parameters = {
+        "wavelength": [0.5, 0.55],
+        "distance": 10,
+        "magV": 5.0,
+        "mag": [5.1, 5.2],
+        "stellar_radius": 1,
+        "nzodis": 3.0,
+        "ra": 180.0,
+        "dec": 0.0,
+        "delta_mag": 20.0,
+        "delta_mag_min": 25,
+    }
+
     with pytest.raises(
         ValueError,
-        match="Either separation \[arcsec\] or semimajor_axis \[AU\] must be provided.",
+        match="Either separation \\[arcsec\\] or semimajor_axis \\[AU\\] must be provided.",
     ):
-        scene.load_configuration(invalid_parameters)
+        scene.load_configuration(parameters)
 
-    # Test with flux inputs
+
+def test_load_configuration_with_flux_inputs():
+    """Test loading configuration with flux-based inputs."""
+    scene = AstrophysicalScene()
     flux_parameters = {
         "wavelength": [0.5, 0.55],
         "distance": 14.8,
@@ -272,6 +451,7 @@ def test_astrophysical_scene_load_configuration(caplog):
         "dec": 02.5151668316500,
         "separation": 0.1,
     }
+
     scene.load_configuration(flux_parameters)
 
     assert scene.dist == flux_parameters["distance"] * DISTANCE
@@ -282,22 +462,82 @@ def test_astrophysical_scene_load_configuration(caplog):
     assert isinstance(scene.Fs_over_F0, u.Quantity)
     assert len(scene.Fs_over_F0) == 2
     assert scene.Fs_over_F0.unit == DIMENSIONLESS
-    assert np.isclose(scene.stellar_angular_diameter_arcsec.value, 0.00059701944566)
-    assert scene.nzodis == flux_parameters["nzodis"] * ZODI
-    assert scene.ra == flux_parameters["ra"] * DEG
-    assert scene.dec == flux_parameters["dec"] * DEG
-    assert scene.separation == flux_parameters["separation"] * ARCSEC
 
-    assert np.allclose(
-        scene.Fs_over_F0.value,
+
+def test_load_configuration_flux_stellar_diameter():
+    """Test that stellar angular diameter is calculated correctly from flux inputs."""
+    scene = AstrophysicalScene()
+    flux_parameters = {
+        "wavelength": [0.5, 0.55],
+        "distance": 14.8,
+        "Fstar_10pc": [1.128e02, 1.13e02],
+        "FstarV_10pc": 1.244e02,
+        "Fp/Fs": [6.3e-8, 6.4e-8],
+        "Fp_min/Fs": 1e-10,
+        "stellar_radius": 0.95,
+        "nzodis": 3.0,
+        "ra": 236.0075773682300,
+        "dec": 02.5151668316500,
+        "separation": 0.1,
+    }
+
+    scene.load_configuration(flux_parameters)
+
+    assert np.isclose(scene.stellar_angular_diameter_arcsec.value, 0.00059701944566)
+
+
+def test_load_configuration_flux_calculations():
+    """Test that flux-to-magnitude conversions are calculated correctly."""
+    scene = AstrophysicalScene()
+    flux_parameters = {
+        "wavelength": [0.5, 0.55],
+        "distance": 14.8,
+        "Fstar_10pc": [1.128e02, 1.13e02],
+        "FstarV_10pc": 1.244e02,
+        "Fp/Fs": [6.3e-8, 6.4e-8],
+        "Fp_min/Fs": 1e-10,
+        "stellar_radius": 0.95,
+        "nzodis": 3.0,
+        "ra": 236.0075773682300,
+        "dec": 02.5151668316500,
+        "separation": 0.1,
+    }
+
+    scene.load_configuration(flux_parameters)
+
+    # Verify Fs_over_F0 calculation
+    expected_fs_over_f0 = (
         np.array(flux_parameters["Fstar_10pc"])
         * (10 * DISTANCE / scene.dist) ** 2
-        / scene.F0.value,
+        / scene.F0.value
     )
+    assert np.allclose(scene.Fs_over_F0.value, expected_fs_over_f0)
+
+    # Verify F0 properties
     assert np.all(scene.F0.unit == PHOTON_FLUX_DENSITY)
     assert len(scene.F0) == len(flux_parameters["wavelength"])
 
-    # Check calculated magnitudes
+
+def test_load_configuration_magnitude_calculations_from_flux():
+    """Test that magnitudes are correctly derived from flux inputs."""
+    scene = AstrophysicalScene()
+    flux_parameters = {
+        "wavelength": [0.5, 0.55],
+        "distance": 14.8,
+        "Fstar_10pc": [1.128e02, 1.13e02],
+        "FstarV_10pc": 1.244e02,
+        "Fp/Fs": [6.3e-8, 6.4e-8],
+        "Fp_min/Fs": 1e-10,
+        "stellar_radius": 0.95,
+        "nzodis": 3.0,
+        "ra": 236.0075773682300,
+        "dec": 02.5151668316500,
+        "separation": 0.1,
+    }
+
+    scene.load_configuration(flux_parameters)
+
+    # Check calculated V magnitude
     calculated_vmag = -2.5 * np.log10(
         flux_parameters["FstarV_10pc"]
         * (10 * DISTANCE / scene.dist) ** 2
@@ -305,6 +545,7 @@ def test_astrophysical_scene_load_configuration(caplog):
     )
     assert np.isclose(scene.vmag.value, calculated_vmag, rtol=1e-6)
 
+    # Check calculated magnitudes
     calculated_mag = -2.5 * np.log10(
         np.array(flux_parameters["Fstar_10pc"])
         * (10 * DISTANCE / scene.dist) ** 2
@@ -312,18 +553,46 @@ def test_astrophysical_scene_load_configuration(caplog):
     )
     assert np.allclose(scene.mag.value, calculated_mag, rtol=1e-6)
 
-    # Check calculated delta_mag and min_delta_mag
+
+def test_load_configuration_delta_mag_calculations_from_flux():
+    """Test that delta magnitudes are correctly derived from flux ratios."""
+    scene = AstrophysicalScene()
+    flux_parameters = {
+        "wavelength": [0.5, 0.55],
+        "distance": 14.8,
+        "Fstar_10pc": [1.128e02, 1.13e02],
+        "FstarV_10pc": 1.244e02,
+        "Fp/Fs": [6.3e-8, 6.4e-8],
+        "Fp_min/Fs": 1e-10,
+        "stellar_radius": 0.95,
+        "nzodis": 3.0,
+        "ra": 236.0075773682300,
+        "dec": 02.5151668316500,
+        "separation": 0.1,
+    }
+
+    scene.load_configuration(flux_parameters)
+
+    # Check calculated delta_mag
     calculated_delta_mag = -2.5 * np.log10(np.array(flux_parameters["Fp/Fs"]))
     assert np.allclose(scene.deltamag.value, calculated_delta_mag, rtol=1e-6)
 
+    # Check calculated min_delta_mag
     calculated_min_delta_mag = -2.5 * np.log10(flux_parameters["Fp_min/Fs"])
     assert np.isclose(scene.min_deltamag.value, calculated_min_delta_mag, rtol=1e-6)
 
-    # Test error handling for insufficient parameters
-    with pytest.raises(KeyError):
-        scene.load_configuration({"distance": 1.0})  # Missing required parameters
 
-    # Test error handling for mixed magnitude and flux inputs
+def test_load_configuration_insufficient_parameters():
+    """Test that loading with insufficient parameters raises KeyError."""
+    scene = AstrophysicalScene()
+
+    with pytest.raises(KeyError):
+        scene.load_configuration({"distance": 1.0})
+
+
+def test_load_configuration_mixed_magnitude_flux_inputs():
+    """Test that mixing magnitude and flux inputs raises ValueError."""
+    scene = AstrophysicalScene()
     mixed_parameters = {
         "wavelength": [0.5, 0.55],
         "distance": 10,
@@ -341,15 +610,33 @@ def test_astrophysical_scene_load_configuration(caplog):
     with pytest.raises(ValueError):
         scene.load_configuration(mixed_parameters)
 
-    # Test with single wavelength
-    single_wavelength_params = parameters.copy()
-    single_wavelength_params["wavelength"] = [0.5]
-    single_wavelength_params["mag"] = [5.1]
-    scene.load_configuration(single_wavelength_params)
+
+def test_load_configuration_single_wavelength():
+    """Test loading configuration with single wavelength."""
+    scene = AstrophysicalScene()
+    parameters = {
+        "wavelength": [0.5],
+        "distance": 10,
+        "magV": 5.0,
+        "mag": [5.1],
+        "stellar_radius": 1,
+        "nzodis": 3.0,
+        "ra": 180.0,
+        "dec": 0.0,
+        "separation": 0.1,
+        "delta_mag": 20.0,
+        "delta_mag_min": 25,
+    }
+
+    scene.load_configuration(parameters)
+
     assert len(scene.mag) == 1
     assert len(scene.Fs_over_F0) == 1
 
-    # FstarV_10pc is missing: if IFS mode, it can be calculated
+
+def test_load_configuration_ifs_mode_missing_fstarv(caplog):
+    """Test that missing FstarV_10pc in IFS mode triggers interpolation warning."""
+    scene = AstrophysicalScene()
     parameters = {
         "wavelength": [0.5, 0.55, 0.6],
         "distance": 10.0,
@@ -364,43 +651,43 @@ def test_astrophysical_scene_load_configuration(caplog):
         "observing_mode": "IFS",
     }
 
-    # Capture warnings
-    caplog.clear()  # Clear any previous logs
-    with caplog.at_level(logging.DEBUG, logger="pyEDITH"):
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger="pyEDITH"):
         scene.load_configuration(parameters)
         assert any(
             "not specified in parameters. Calculating internally..." in record.message
             for record in caplog.records
-            if record.levelno == logging.WARNING
         )
 
-    # Test case where ez_PPF is provided as a scalar (to be propagated at all wavelengths)
-    parameters["ez_PPF"] = 100.0
-    scene.load_configuration(parameters)
-    assert np.array_equal(
-        scene.ez_PPF, parameters["ez_PPF"] * np.ones_like(parameters["Fp/Fs"])
-    )
 
-    # Test case where ez_PPF is provided as an array of values
-    parameters["ez_PPF"] = [100.0, 100.0, 100.0]
-    scene.load_configuration(parameters)
-    assert np.array_equal(
-        scene.ez_PPF, parameters["ez_PPF"] * np.ones_like(parameters["Fp/Fs"])
-    )
+def test_load_configuration_ifs_mode_fstarv_interpolation():
+    """Test that FstarV_10pc is correctly interpolated in IFS mode."""
+    scene = AstrophysicalScene()
+    parameters = {
+        "wavelength": [0.5, 0.55, 0.6],
+        "distance": 10.0,
+        "Fstar_10pc": [1.128e02, 1.244e02, 1.13e02],
+        "Fp/Fs": [6.3e-8, 6.4e-8, 6.5e-8],
+        "Fp_min/Fs": 1e-10,
+        "stellar_radius": 1,
+        "nzodis": 3.0,
+        "ra": 236.0075773682300,
+        "dec": 02.5151668316500,
+        "separation": 0.1,
+        "observing_mode": "IFS",
+    }
 
-    # Test case where ez_PPF is provided as an array of values, but its length is mismatched with other wavelength dependent inputs
-    with pytest.raises(
-        AssertionError, match="length of ez_PPF does not match length of Fp_over_Fs"
-    ):
-        parameters["ez_PPF"] = [100.0]
-        scene.load_configuration(parameters)
+    scene.load_configuration(parameters)
 
     # The interpolated value at 0.55 um should be close to 1.244e02
     expected_fstarv = 1.244e02 * PHOTON_FLUX_DENSITY
     calculated_fstarv = scene.Fs_over_F0[1] * scene.F0[1]  # At 0.55 um
     assert np.isclose(calculated_fstarv, expected_fstarv, rtol=1e-6)
 
-    # FstarV_10pc is missing: in IMAGER mode, just fail
+
+def test_load_configuration_imager_mode_missing_fstarv():
+    """Test that missing FstarV_10pc in IMAGER mode raises ValueError."""
+    scene = AstrophysicalScene()
     parameters = {
         "wavelength": 0.5,
         "distance": 10.0,
@@ -415,16 +702,92 @@ def test_astrophysical_scene_load_configuration(caplog):
         "observing_mode": "IMAGER",
     }
 
-    # Capture warnings
     with pytest.raises(ValueError, match="FstarV_10pc missing in parameters."):
         scene.load_configuration(parameters)
 
 
-def test_calculate_zodi_exozodi():
-    # Create an AstrophysicalScene instance
+def test_load_configuration_ez_ppf_scalar():
+    """Test that scalar ez_PPF is propagated to all wavelengths."""
     scene = AstrophysicalScene()
+    parameters = {
+        "wavelength": [0.5, 0.55, 0.6],
+        "distance": 10.0,
+        "Fstar_10pc": [1.128e02, 1.244e02, 1.13e02],
+        "FstarV_10pc": 1.244e02,
+        "Fp/Fs": [6.3e-8, 6.4e-8, 6.5e-8],
+        "Fp_min/Fs": 1e-10,
+        "stellar_radius": 1,
+        "nzodis": 3.0,
+        "ra": 236.0075773682300,
+        "dec": 02.5151668316500,
+        "separation": 0.1,
+        "ez_PPF": 100.0,
+    }
 
-    # Set up parameters
+    scene.load_configuration(parameters)
+
+    assert np.array_equal(
+        scene.ez_PPF, parameters["ez_PPF"] * np.ones_like(parameters["Fp/Fs"])
+    )
+
+
+def test_load_configuration_ez_ppf_array():
+    """Test that array ez_PPF is correctly loaded."""
+    scene = AstrophysicalScene()
+    parameters = {
+        "wavelength": [0.5, 0.55, 0.6],
+        "distance": 10.0,
+        "Fstar_10pc": [1.128e02, 1.244e02, 1.13e02],
+        "FstarV_10pc": 1.244e02,
+        "Fp/Fs": [6.3e-8, 6.4e-8, 6.5e-8],
+        "Fp_min/Fs": 1e-10,
+        "stellar_radius": 1,
+        "nzodis": 3.0,
+        "ra": 236.0075773682300,
+        "dec": 02.5151668316500,
+        "separation": 0.1,
+        "ez_PPF": [100.0, 100.0, 100.0],
+    }
+
+    scene.load_configuration(parameters)
+
+    assert np.array_equal(
+        scene.ez_PPF, parameters["ez_PPF"] * np.ones_like(parameters["Fp/Fs"])
+    )
+
+
+def test_load_configuration_ez_ppf_mismatched_length():
+    """Test that mismatched ez_PPF array length raises AssertionError."""
+    scene = AstrophysicalScene()
+    parameters = {
+        "wavelength": [0.5, 0.55, 0.6],
+        "distance": 10.0,
+        "Fstar_10pc": [1.128e02, 1.244e02, 1.13e02],
+        "FstarV_10pc": 1.244e02,
+        "Fp/Fs": [6.3e-8, 6.4e-8, 6.5e-8],
+        "Fp_min/Fs": 1e-10,
+        "stellar_radius": 1,
+        "nzodis": 3.0,
+        "ra": 236.0075773682300,
+        "dec": 02.5151668316500,
+        "separation": 0.1,
+        "ez_PPF": [100.0],  # Wrong length
+    }
+
+    with pytest.raises(
+        AssertionError, match="length of ez_PPF does not match length of Fp_over_Fs"
+    ):
+        scene.load_configuration(parameters)
+
+
+# ============================================================================
+# Tests for AstrophysicalScene.calculate_zodi_exozodi
+# ============================================================================
+
+
+def test_calculate_zodi_exozodi_creates_flux_attributes():
+    """Test that calculate_zodi_exozodi creates required flux attributes."""
+    scene = AstrophysicalScene()
     parameters = {
         "wavelength": [0.5, 0.55, 0.6],
         "distance": 14.8,
@@ -439,67 +802,184 @@ def test_calculate_zodi_exozodi():
         "delta_mag_min": 25.0,
     }
 
-    # Load configuration
     scene.load_configuration(parameters)
-
-    # Create a mock Observation object
-    class MockObservation:
-        wavelength = np.array(parameters["wavelength"]) * WAVELENGTH
-        nlambd = len(wavelength)
-
-    observation = MockObservation()
-
-    # Calculate zodi and exozodi
     scene.calculate_zodi_exozodi(parameters)
 
-    # Check that Fzodi_list, Fexozodi_list, and Fbinary_list are created
     assert hasattr(scene, "Fzodi_list")
     assert hasattr(scene, "Fexozodi_list")
     assert hasattr(scene, "Fbinary_list")
 
-    # Check that the lists have the correct length
-    assert len(scene.Fzodi_list) == observation.nlambd
-    assert len(scene.Fexozodi_list) == observation.nlambd
-    assert len(scene.Fbinary_list) == observation.nlambd
 
-    # Check that the values are non-negative
+def test_calculate_zodi_exozodi_correct_array_lengths():
+    """Test that flux arrays have correct length matching wavelength array."""
+    scene = AstrophysicalScene()
+    parameters = {
+        "wavelength": [0.5, 0.55, 0.6],
+        "distance": 14.8,
+        "magV": 5.84,
+        "mag": [5.687, 5.632, 5.577],
+        "stellar_radius": 1,
+        "nzodis": 3.0,
+        "ra": 236.0075773682300,
+        "dec": 02.5151668316500,
+        "separation": 0.1,
+        "delta_mag": 25.5,
+        "delta_mag_min": 25.0,
+    }
+
+    scene.load_configuration(parameters)
+    scene.calculate_zodi_exozodi(parameters)
+
+    nlambd = len(parameters["wavelength"])
+    assert len(scene.Fzodi_list) == nlambd
+    assert len(scene.Fexozodi_list) == nlambd
+    assert len(scene.Fbinary_list) == nlambd
+
+
+def test_calculate_zodi_exozodi_flux_values():
+    """Test that calculated fluxes have expected properties."""
+    scene = AstrophysicalScene()
+    parameters = {
+        "wavelength": [0.5, 0.55, 0.6],
+        "distance": 14.8,
+        "magV": 5.84,
+        "mag": [5.687, 5.632, 5.577],
+        "stellar_radius": 1,
+        "nzodis": 3.0,
+        "ra": 236.0075773682300,
+        "dec": 02.5151668316500,
+        "separation": 0.1,
+        "delta_mag": 25.5,
+        "delta_mag_min": 25.0,
+    }
+
+    scene.load_configuration(parameters)
+    scene.calculate_zodi_exozodi(parameters)
+
     assert np.all(scene.Fzodi_list.value >= 0)
     assert np.all(scene.Fexozodi_list.value >= 0)
-    assert np.all(
-        scene.Fbinary_list.value == 0
-    )  # Binary flux should be zero as per the implementation
+    assert np.all(scene.Fbinary_list.value == 0)  # Binary flux should be zero
 
-    # Check units
+
+def test_calculate_zodi_exozodi_correct_units():
+    """Test that flux arrays have correct units."""
+    scene = AstrophysicalScene()
+    parameters = {
+        "wavelength": [0.5, 0.55, 0.6],
+        "distance": 14.8,
+        "magV": 5.84,
+        "mag": [5.687, 5.632, 5.577],
+        "stellar_radius": 1,
+        "nzodis": 3.0,
+        "ra": 236.0075773682300,
+        "dec": 02.5151668316500,
+        "separation": 0.1,
+        "delta_mag": 25.5,
+        "delta_mag_min": 25.0,
+    }
+
+    scene.load_configuration(parameters)
+    scene.calculate_zodi_exozodi(parameters)
+
     assert scene.Fzodi_list.unit.is_equivalent(INV_SQUARE_ARCSEC)
     assert scene.Fexozodi_list.unit.is_equivalent(INV_SQUARE_ARCSEC)
     assert scene.Fbinary_list.unit == DIMENSIONLESS
 
-    # Check that M_V is calculated correctly
+
+def test_calculate_zodi_exozodi_absolute_magnitude():
+    """Test that absolute magnitude M_V is calculated correctly."""
+    scene = AstrophysicalScene()
+    parameters = {
+        "wavelength": [0.5, 0.55, 0.6],
+        "distance": 14.8,
+        "magV": 5.84,
+        "mag": [5.687, 5.632, 5.577],
+        "stellar_radius": 1,
+        "nzodis": 3.0,
+        "ra": 236.0075773682300,
+        "dec": 02.5151668316500,
+        "separation": 0.1,
+        "delta_mag": 25.5,
+        "delta_mag_min": 25.0,
+    }
+
+    scene.load_configuration(parameters)
+    scene.calculate_zodi_exozodi(parameters)
+
     expected_M_V = (
         scene.vmag - 5 * np.log10(scene.dist.value) * MAGNITUDE + 5 * MAGNITUDE
     )
     assert np.isclose(scene.M_V.value, expected_M_V.value)
 
-    # Test with single wavelength
-    single_wavelength_params = parameters.copy()
-    single_wavelength_params["wavelength"] = [0.5]
-    single_wavelength_params["mag"] = [5.1]
 
-    scene.calculate_zodi_exozodi(single_wavelength_params)
+def test_calculate_zodi_exozodi_single_wavelength():
+    """Test calculate_zodi_exozodi with single wavelength."""
+    scene = AstrophysicalScene()
+    parameters = {
+        "wavelength": [0.5],
+        "distance": 14.8,
+        "magV": 5.84,
+        "mag": [5.687],
+        "stellar_radius": 1,
+        "nzodis": 3.0,
+        "ra": 236.0075773682300,
+        "dec": 02.5151668316500,
+        "separation": 0.1,
+        "delta_mag": 25.5,
+        "delta_mag_min": 25.0,
+    }
+
+    scene.load_configuration(parameters)
+    scene.calculate_zodi_exozodi(parameters)
+
     assert len(scene.Fzodi_list) == 1
     assert len(scene.Fexozodi_list) == 1
     assert len(scene.Fbinary_list) == 1
 
-    # Test error handling
-    with pytest.raises(KeyError):
+
+def test_calculate_zodi_exozodi_missing_parameters():
+    """Test that calculate_zodi_exozodi raises error when scene is not configured."""
+    scene = AstrophysicalScene()
+
+    # Try to calculate without configuring the scene first
+    with pytest.raises(AttributeError, match="must be configured before"):
         scene.calculate_zodi_exozodi({})
 
 
-def test_validate_configuration():
+def test_calculate_zodi_exozodi_missing_wavelength():
+    """Test that calculate_zodi_exozodi raises error when wavelength is missing."""
     scene = AstrophysicalScene()
 
-    # Set up valid parameters
-    valid_parameters = {
+    # Configure the scene properly
+    parameters = {
+        "wavelength": [0.5, 0.55, 0.6],
+        "distance": 14.8,
+        "magV": 5.84,
+        "mag": [5.687, 5.632, 5.577],
+        "stellar_radius": 1,
+        "nzodis": 3.0,
+        "ra": 236.0075773682300,
+        "dec": 02.5151668316500,
+        "separation": 0.1,
+        "delta_mag": 25.5,
+        "delta_mag_min": 25.0,
+    }
+    scene.load_configuration(parameters)
+
+    # Now try to calculate with missing wavelength
+    with pytest.raises(KeyError, match="wavelength"):
+        scene.calculate_zodi_exozodi({})
+
+
+# ============================================================================
+# Tests for AstrophysicalScene.validate_configuration
+# ============================================================================
+
+
+def test_validate_configuration_with_valid_scene():
+    """Test that validate_configuration passes with a properly configured scene."""
+    scene = AstrophysicalScene()
+    parameters = {
         "wavelength": [0.5, 0.55, 0.6],
         "distance": 14.8,
         "magV": 5.84,
@@ -513,24 +993,16 @@ def test_validate_configuration():
         "delta_mag_min": 25.0,
     }
 
-    # Load valid configuration
-    scene.load_configuration(valid_parameters)
+    scene.load_configuration(parameters)
+    scene.calculate_zodi_exozodi(parameters)
 
-    # Mock observation for calculate_zodi_exozodi
-    class MockObservation:
-        wavelength = np.array(valid_parameters["wavelength"]) * WAVELENGTH
-        nlambd = len(wavelength)
+    # Should not raise any exception
+    scene.validate_configuration()
 
-    scene.calculate_zodi_exozodi(valid_parameters)
 
-    # Test valid configuration
-    try:
-        scene.validate_configuration()
-    except Exception as e:
-        pytest.fail(f"Valid configuration raised an unexpected exception: {e}")
-
-    # Test missing attributes
-    for attr in [
+@pytest.mark.parametrize(
+    "attr",
+    [
         "dist",
         "stellar_angular_diameter_arcsec",
         "nzodis",
@@ -544,17 +1016,44 @@ def test_validate_configuration():
         "Fbinary_list",
         "Fp_over_Fs",
         "Fs_over_F0",
-    ]:
-        temp = getattr(scene, attr)
-        delattr(scene, attr)
-        with pytest.raises(
-            AttributeError, match=f"AstrophysicalScene is missing attribute: {attr}"
-        ):
-            scene.validate_configuration()
-        setattr(scene, attr, temp)
+    ],
+)
+def test_validate_configuration_missing_attributes(attr):
+    """Test that validate_configuration raises AttributeError for missing attributes."""
+    scene = AstrophysicalScene()
+    parameters = {
+        "wavelength": [0.5, 0.55, 0.6],
+        "distance": 14.8,
+        "magV": 5.84,
+        "mag": [5.687, 5.632, 5.577],
+        "stellar_radius": 0.95,
+        "nzodis": 3.0,
+        "ra": 236.0075773682300,
+        "dec": 02.5151668316500,
+        "separation": 0.1,
+        "delta_mag": 25.5,
+        "delta_mag_min": 25.0,
+    }
 
-    # # Test incorrect types
-    incorrect_type_tests = [
+    scene.load_configuration(parameters)
+    scene.calculate_zodi_exozodi(parameters)
+
+    # Remove the attribute
+    temp = getattr(scene, attr)
+    delattr(scene, attr)
+
+    with pytest.raises(
+        AttributeError, match=f"AstrophysicalScene is missing attribute: {attr}"
+    ):
+        scene.validate_configuration()
+
+    # Restore for cleanup
+    setattr(scene, attr, temp)
+
+
+@pytest.mark.parametrize(
+    "attr,incorrect_value",
+    [
         ("dist", 10),
         ("stellar_angular_diameter_arcsec", 0.01),
         ("nzodis", 3),
@@ -568,19 +1067,42 @@ def test_validate_configuration():
         ("Fbinary_list", [0, 0, 0]),
         ("Fp_over_Fs", [1e-5, 1e-5, 1e-5]),
         ("Fs_over_F0", [1, 1, 1]),
-    ]
+    ],
+)
+def test_validate_configuration_incorrect_types(attr, incorrect_value):
+    """Test that validate_configuration raises TypeError for non-Quantity attributes."""
+    scene = AstrophysicalScene()
+    parameters = {
+        "wavelength": [0.5, 0.55, 0.6],
+        "distance": 14.8,
+        "magV": 5.84,
+        "mag": [5.687, 5.632, 5.577],
+        "stellar_radius": 0.95,
+        "nzodis": 3.0,
+        "ra": 236.0075773682300,
+        "dec": 02.5151668316500,
+        "separation": 0.1,
+        "delta_mag": 25.5,
+        "delta_mag_min": 25.0,
+    }
 
-    for attr, incorrect_value in incorrect_type_tests:
-        temp = getattr(scene, attr)
-        setattr(scene, attr, incorrect_value)
-        with pytest.raises(
-            TypeError, match=f"AstrophysicalScene attribute {attr} should be a Quantity"
-        ):
-            scene.validate_configuration()
-        setattr(scene, attr, temp)
+    scene.load_configuration(parameters)
+    scene.calculate_zodi_exozodi(parameters)
 
-    # Test incorrect units
-    incorrect_unit_tests = [
+    temp = getattr(scene, attr)
+    setattr(scene, attr, incorrect_value)
+
+    with pytest.raises(
+        TypeError, match=f"AstrophysicalScene attribute {attr} should be a Quantity"
+    ):
+        scene.validate_configuration()
+
+    setattr(scene, attr, temp)
+
+
+@pytest.mark.parametrize(
+    "attr,incorrect_value",
+    [
         ("dist", 10 * u.km),
         ("stellar_angular_diameter_arcsec", 0.01 * u.rad),
         ("nzodis", 3 * u.m),
@@ -594,29 +1116,40 @@ def test_validate_configuration():
         ("Fbinary_list", [0, 0, 0] * u.m),
         ("Fp_over_Fs", [1e-5, 1e-5, 1e-5] * u.m),
         ("Fs_over_F0", [1, 1, 1] * u.m),
-    ]
+    ],
+)
+def test_validate_configuration_incorrect_units(attr, incorrect_value):
+    """Test that validate_configuration raises ValueError for incorrect units."""
+    scene = AstrophysicalScene()
+    parameters = {
+        "wavelength": [0.5, 0.55, 0.6],
+        "distance": 14.8,
+        "magV": 5.84,
+        "mag": [5.687, 5.632, 5.577],
+        "stellar_radius": 0.95,
+        "nzodis": 3.0,
+        "ra": 236.0075773682300,
+        "dec": 02.5151668316500,
+        "separation": 0.1,
+        "delta_mag": 25.5,
+        "delta_mag_min": 25.0,
+    }
 
-    for attr, incorrect_value in incorrect_unit_tests:
-        temp = getattr(scene, attr)
-        setattr(scene, attr, incorrect_value)
-        try:
-            scene.validate_configuration()
-            pytest.fail(
-                f"Expected ValueError for incorrect units of {attr}, but no exception was raised"
-            )
-        except Exception as e:
-            assert isinstance(
-                e, ValueError
-            ), f"Expected ValueError for {attr}, but got {type(e).__name__}"
-            assert "has incorrect units" in str(
-                e
-            ), f"Unexpected error message for {attr}: {str(e)}"
-        finally:
-            setattr(scene, attr, temp)
+    scene.load_configuration(parameters)
+    scene.calculate_zodi_exozodi(parameters)
 
-    # Test non-numerical values
-    # Test attributes with invalid types
-    attributes_to_test = [
+    temp = getattr(scene, attr)
+    setattr(scene, attr, incorrect_value)
+
+    with pytest.raises(ValueError, match="has incorrect units"):
+        scene.validate_configuration()
+
+    setattr(scene, attr, temp)
+
+
+@pytest.mark.parametrize(
+    "attr",
+    [
         "dist",
         "stellar_angular_diameter_arcsec",
         "nzodis",
@@ -630,51 +1163,58 @@ def test_validate_configuration():
         "Fbinary_list",
         "Fp_over_Fs",
         "Fs_over_F0",
-    ]
+    ],
+)
+def test_validate_configuration_invalid_string_values(attr):
+    """Test that validate_configuration raises error for string values."""
+    scene = AstrophysicalScene()
+    parameters = {
+        "wavelength": [0.5, 0.55, 0.6],
+        "distance": 14.8,
+        "magV": 5.84,
+        "mag": [5.687, 5.632, 5.577],
+        "stellar_radius": 0.95,
+        "nzodis": 3.0,
+        "ra": 236.0075773682300,
+        "dec": 02.5151668316500,
+        "separation": 0.1,
+        "delta_mag": 25.5,
+        "delta_mag_min": 25.0,
+    }
 
-    for attr in attributes_to_test:
-        original_value = getattr(scene, attr)
-        try:
-            # Set attribute to an invalid type
-            if isinstance(original_value, (u.Quantity, list, np.ndarray)):
-                setattr(scene, attr, "invalid string")
-            else:
-                setattr(scene, attr, ["invalid", "list"])
+    scene.load_configuration(parameters)
+    scene.calculate_zodi_exozodi(parameters)
 
-            with pytest.raises((TypeError, ValueError)):
-                scene.validate_configuration()
-        finally:
-            # Restore the original value
-            setattr(scene, attr, original_value)
+    original_value = getattr(scene, attr)
+    setattr(scene, attr, "invalid string")
 
-    # Test missing attributes
-    for attr in attributes_to_test:
-        if hasattr(scene, attr):
-            original_value = getattr(scene, attr)
-            delattr(scene, attr)
-            with pytest.raises(AttributeError):
-                scene.validate_configuration()
-            setattr(scene, attr, original_value)
+    with pytest.raises((TypeError, ValueError)):
+        scene.validate_configuration()
+
+    setattr(scene, attr, original_value)
 
 
-def test_regrid_spectra():
+# ============================================================================
+# Tests for AstrophysicalScene.regrid_spectra
+# ============================================================================
+
+
+def test_regrid_spectra_basic_functionality():
+    """Test that regrid_spectra correctly bins down to observation wavelength grid."""
     scene = AstrophysicalScene()
 
     parameters = {
-        "wavelength": np.linspace(0.5, 1.7, 1000),  # user-provided wavelength grid
+        "wavelength": np.linspace(0.5, 1.7, 1000),
     }
 
-    # Create a mock Observation object
     class MockObservation:
-        wavelength = (
-            np.linspace(0.5, 1.7, 100) * WAVELENGTH
-        )  # the binned-down wavelength grid calculated with the specified R and channel cutoffs
+        wavelength = np.linspace(0.5, 1.7, 100) * WAVELENGTH
         nlambd = len(wavelength)
         delta_wavelength = np.gradient(wavelength)
 
     observation = MockObservation()
 
-    # set up the scene: assign relevant arrays random numbers
+    # Set up scene with random spectra
     scene.F0 = np.random.randn(len(parameters["wavelength"])) * PHOTON_FLUX_DENSITY
     scene.Fzodi_list = (
         np.random.randn(len(parameters["wavelength"])) * PHOTON_FLUX_DENSITY
@@ -695,10 +1235,58 @@ def test_regrid_spectra():
 
     scene.regrid_spectra(parameters, observation)
 
-    # check that everything was binned down to the proper wavelength grid
+    # Check that all arrays match observation wavelength grid
     assert len(scene.F0) == observation.nlambd
     assert len(scene.Fzodi_list) == observation.nlambd
     assert len(scene.Fexozodi_list) == observation.nlambd
     assert len(scene.Fbinary_list) == observation.nlambd
     assert len(scene.Fp_over_Fs) == observation.nlambd
     assert len(scene.Fs_over_F0) == observation.nlambd
+
+
+def test_regrid_spectra_preserves_units():
+    """Test that regrid_spectra preserves units of all quantities."""
+    scene = AstrophysicalScene()
+
+    parameters = {
+        "wavelength": np.linspace(0.5, 1.7, 1000),
+    }
+
+    class MockObservation:
+        wavelength = np.linspace(0.5, 1.7, 100) * WAVELENGTH
+        nlambd = len(wavelength)
+        delta_wavelength = np.gradient(wavelength)
+
+    observation = MockObservation()
+
+    # Set up scene with specific units
+    scene.F0 = np.random.randn(len(parameters["wavelength"])) * PHOTON_FLUX_DENSITY
+    scene.Fzodi_list = (
+        np.random.randn(len(parameters["wavelength"])) * INV_SQUARE_ARCSEC
+    )
+    scene.Fexozodi_list = (
+        np.random.randn(len(parameters["wavelength"])) * INV_SQUARE_ARCSEC
+    )
+    scene.Fbinary_list = np.random.randn(len(parameters["wavelength"])) * DIMENSIONLESS
+    scene.Fp_over_Fs = np.random.randn(len(parameters["wavelength"])) * DIMENSIONLESS
+    scene.Fs_over_F0 = np.random.randn(len(parameters["wavelength"])) * DIMENSIONLESS
+    scene.ez_PPF = 100 * np.ones(len(scene.Fexozodi_list)) * DIMENSIONLESS
+
+    original_units = {
+        "F0": scene.F0.unit,
+        "Fzodi_list": scene.Fzodi_list.unit,
+        "Fexozodi_list": scene.Fexozodi_list.unit,
+        "Fbinary_list": scene.Fbinary_list.unit,
+        "Fp_over_Fs": scene.Fp_over_Fs.unit,
+        "Fs_over_F0": scene.Fs_over_F0.unit,
+    }
+
+    scene.regrid_spectra(parameters, observation)
+
+    # Check that units are preserved
+    assert scene.F0.unit == original_units["F0"]
+    assert scene.Fzodi_list.unit == original_units["Fzodi_list"]
+    assert scene.Fexozodi_list.unit == original_units["Fexozodi_list"]
+    assert scene.Fbinary_list.unit == original_units["Fbinary_list"]
+    assert scene.Fp_over_Fs.unit == original_units["Fp_over_Fs"]
+    assert scene.Fs_over_F0.unit == original_units["Fs_over_F0"]

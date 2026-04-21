@@ -4,16 +4,16 @@ import numpy as np
 from pyEDITH.cli import main, calculate_texp, calculate_snr
 from pyEDITH import AstrophysicalScene, Observation, ObservatoryBuilder
 from io import StringIO
-import tempfile
-import os
+
+
+# ============================================================================
+# Fixtures
+# ============================================================================
 
 
 @pytest.fixture
 def mock_args():
-    """
-    Fixture to create a mock arguments object.
-    This simulates the parsed command-line arguments.
-    """
+    """Fixture to create a mock arguments object simulating parsed CLI arguments."""
 
     class Args:
         edith = "test.edith"
@@ -25,10 +25,7 @@ def mock_args():
 
 @pytest.fixture
 def mock_parameters():
-    """
-    Fixture to create a mock parameters dictionary.
-    This simulates the parsed configuration from an .edith file.
-    """
+    """Fixture to create a mock parameters dictionary from .edith file."""
     return {
         "wavelength": [0.5],
         "distance": 10,
@@ -39,12 +36,38 @@ def mock_parameters():
     }
 
 
-def test_main_no_args():
-    """Test main function with no arguments."""
+@pytest.fixture
+def mock_parameters_ifs():
+    """Fixture to create mock parameters for IFS mode with regridding."""
+    return {
+        "wavelength": [0.5],
+        "distance": 10,
+        "magV": 5.0,
+        "nzodis": 3.0,
+        "observing_mode": "IFS",
+        "observatory_preset": "ToyModel",
+        "spectral_resolution": [140, 40],
+        "channel_bounds": 1.0,
+        "regrid_wavelength": True,
+    }
+
+
+# ============================================================================
+# Tests for main() - No arguments
+# ============================================================================
+
+
+def test_main_no_args_shows_help():
+    """Test that main with no arguments displays usage help."""
     with patch("sys.argv", ["edith"]):
         with patch("sys.stdout", new=StringIO()) as fake_out:
             main()
             assert "usage: edith" in fake_out.getvalue()
+
+
+# ============================================================================
+# Tests for main() - Missing required arguments
+# ============================================================================
 
 
 @pytest.mark.parametrize(
@@ -58,15 +81,15 @@ def test_main_no_args():
         ("etc2snr", "--edith argument is required for etc2snr subfunction."),
     ],
 )
-def test_main_missing_edith_arg(subcommand, error_message):
-    """Test main function with missing --edith argument for each subcommand."""
+def test_main_missing_edith_argument(subcommand, error_message):
+    """Test that missing --edith argument raises appropriate error for each subcommand."""
     with patch("sys.argv", ["edith", subcommand]):
         with pytest.raises(SyntaxError, match=error_message):
             main()
 
 
-def test_main_snr_missing_time_arg():
-    """Test main function with missing --time argument for snr subcommand."""
+def test_main_snr_missing_time_argument():
+    """Test that snr subcommand requires both --edith and --time arguments."""
     with patch("sys.argv", ["edith", "snr", "--edith", "test.edith"]):
         with pytest.raises(
             SyntaxError,
@@ -75,9 +98,54 @@ def test_main_snr_missing_time_arg():
             main()
 
 
+# ============================================================================
+# Tests for main() - etc subcommand
+# ============================================================================
+
+
 @patch("pyEDITH.cli.parse_input.read_configuration")
-def test_main_etc2snr_no_secondary_params(mock_read_configuration):
-    """Test main function when etc2snr has no secondary parameters."""
+@patch("pyEDITH.cli.calculate_texp")
+def test_main_etc_basic_execution(
+    mock_calculate_texp, mock_read_configuration, mock_args
+):
+    """Test that etc subcommand correctly calculates and prints exposure time."""
+    mock_read_configuration.return_value = ({}, {})
+    mock_calculate_texp.return_value = (np.array([1.0]), {})
+
+    with patch("sys.argv", ["edith", "etc", "--edith", "test.edith"]):
+        with patch("builtins.print") as mock_print:
+            main()
+            mock_print.assert_called_with(np.array([1.0]))
+
+
+# ============================================================================
+# Tests for main() - snr subcommand
+# ============================================================================
+
+
+@patch("pyEDITH.cli.parse_input.read_configuration")
+@patch("pyEDITH.cli.calculate_snr")
+def test_main_snr_basic_execution(
+    mock_calculate_snr, mock_read_configuration, mock_args
+):
+    """Test that snr subcommand correctly calculates and prints SNR."""
+    mock_read_configuration.return_value = ({}, {})
+    mock_calculate_snr.return_value = (np.array([10.0]), {})
+
+    with patch("sys.argv", ["edith", "snr", "--edith", "test.edith", "--time", "60"]):
+        with patch("builtins.print") as mock_print:
+            main()
+            mock_print.assert_called_with(np.array([10.0]))
+
+
+# ============================================================================
+# Tests for main() - etc2snr subcommand
+# ============================================================================
+
+
+@patch("pyEDITH.cli.parse_input.read_configuration")
+def test_main_etc2snr_missing_secondary_params(mock_read_configuration):
+    """Test that etc2snr raises error when secondary parameters not specified."""
     mock_read_configuration.return_value = ({}, {})
 
     with patch("sys.argv", ["edith", "etc2snr", "--edith", "test.edith"]):
@@ -88,8 +156,8 @@ def test_main_etc2snr_no_secondary_params(mock_read_configuration):
 
 
 @patch("pyEDITH.cli.parse_input.read_configuration")
-def test_main_etc2snr_multiple_primary_lambdas(mock_read_configuration):
-    """Test main function when etc2snr has multiple primary lambdas."""
+def test_main_etc2snr_multiple_primary_wavelengths(mock_read_configuration):
+    """Test that etc2snr rejects multiple primary wavelengths."""
     mock_read_configuration.return_value = (
         {"wavelength": [0.5, 0.6]},
         {"wavelength": [0.7]},
@@ -107,7 +175,7 @@ def test_main_etc2snr_multiple_primary_lambdas(mock_read_configuration):
 def test_main_etc2snr_infinite_exposure_time(
     mock_calculate_texp, mock_read_configuration
 ):
-    """Test main function when etc2snr calculation returns infinite exposure time."""
+    """Test that etc2snr raises error when exposure time is infinite."""
     mock_read_configuration.return_value = (
         {"wavelength": [0.5]},
         {"wavelength": [0.6]},
@@ -121,52 +189,11 @@ def test_main_etc2snr_infinite_exposure_time(
 
 @patch("pyEDITH.cli.parse_input.read_configuration")
 @patch("pyEDITH.cli.calculate_texp")
-def test_main_etc(mock_calculate_texp, mock_read_configuration, mock_args):
-    """
-    Test the 'etc' subcommand of the main CLI function.
-
-    This test mocks the configuration reading and exposure time calculation,
-    then checks if the main function correctly calls these and prints the result.
-    """
-    mock_read_configuration.return_value = ({}, {})
-    mock_calculate_texp.return_value = (np.array([1.0]), {})
-
-    with patch("sys.argv", ["edith", "etc", "--edith", "test.edith"]):
-        with patch("builtins.print") as mock_print:
-            main()
-            mock_print.assert_called_with(np.array([1.0]))
-
-
-@patch("pyEDITH.cli.parse_input.read_configuration")
 @patch("pyEDITH.cli.calculate_snr")
-def test_main_snr(mock_calculate_snr, mock_read_configuration, mock_args):
-    """
-    Test the 'snr' subcommand of the main CLI function.
-
-    This test mocks the configuration reading and SNR calculation,
-    then checks if the main function correctly calls these and prints the result.
-    """
-    mock_read_configuration.return_value = ({}, {})
-    mock_calculate_snr.return_value = (np.array([10.0]), {})
-
-    with patch("sys.argv", ["edith", "snr", "--edith", "test.edith", "--time", "60"]):
-        with patch("builtins.print") as mock_print:
-            main()
-            mock_print.assert_called_with(np.array([10.0]))
-
-
-@patch("pyEDITH.cli.parse_input.read_configuration")
-@patch("pyEDITH.cli.calculate_texp")
-@patch("pyEDITH.cli.calculate_snr")
-def test_main_etc2snr(
+def test_main_etc2snr_successful_calculation(
     mock_calculate_snr, mock_calculate_texp, mock_read_configuration, mock_args
 ):
-    """
-    Test the 'etc2snr' subcommand of the main CLI function.
-
-    This test mocks the configuration reading, exposure time calculation, and SNR calculation.
-    It then checks if the main function correctly calls these and prints the results.
-    """
+    """Test that etc2snr correctly calculates exposure time and SNR for secondary wavelength."""
     mock_read_configuration.return_value = (
         {"wavelength": [0.5], "extra_param": 0.1},
         {"wavelength": [0.6]},
@@ -183,223 +210,308 @@ def test_main_etc2snr(
             )
 
 
-def test_calculate_texp(mock_parameters):
-    """
-    Test the calculate_texp function.
-
-    This test mocks the Observation, AstrophysicalScene, ObservatoryBuilder, and
-    calculate_exposure_time_or_snr functions. It then checks if calculate_texp
-    correctly sets up these objects and calls the calculation function.
-    """
-    with (
-        patch("pyEDITH.cli.Observation") as mock_observation,
-        patch("pyEDITH.cli.AstrophysicalScene") as mock_scene,
-        patch("pyEDITH.cli.ObservatoryBuilder") as mock_builder,
-        patch("pyEDITH.cli.calculate_exposure_time_or_snr") as mock_calculate,
-    ):
-
-        # Set up mock objects and their return values
-        mock_observation_instance = MagicMock()
-        mock_observation_instance.exptime = np.array([1.0])
-        mock_observation_instance.validation_variables = {}
-        mock_observation.return_value = mock_observation_instance
-
-        mock_scene_instance = MagicMock()
-        mock_scene.return_value = mock_scene_instance
-
-        mock_observatory = MagicMock()
-        mock_builder.create_observatory.return_value = mock_observatory
-
-        # Call the function under test
-        texp, validation_variables = calculate_texp(mock_parameters, False)
-
-        # Assert the results
-        assert np.array_equal(texp, np.array([1.0]))
-        assert validation_variables == {}
-
-        # Check that all expected method calls occurred
-        mock_observation.assert_called_once()
-        mock_scene.assert_called_once()
-        mock_builder.create_observatory.assert_called_once()
-        mock_calculate.assert_called_once()
-
-    # modify the mock parameters to test IFS mode regridding in scene
-    mock_parameters["spectral_resolution"] = [140, 40]
-    mock_parameters["channel_bounds"] = 1.0
-    mock_parameters["regrid_wavelength"] = True
-    mock_parameters["observing_mode"] = "IFS"
-
-    with (
-        patch("pyEDITH.cli.Observation") as mock_observation,
-        patch("pyEDITH.cli.AstrophysicalScene") as mock_scene,
-        patch("pyEDITH.cli.ObservatoryBuilder") as mock_builder,
-        patch("pyEDITH.cli.calculate_exposure_time_or_snr") as mock_calculate,
-    ):
-
-        # Set up mock objects and their return values
-        mock_observation_instance = MagicMock()
-        mock_observation_instance.exptime = np.array([1.0])
-        mock_observation_instance.validation_variables = {}
-        mock_observation.return_value = mock_observation_instance
-
-        mock_scene_instance = MagicMock()
-        mock_scene.return_value = mock_scene_instance
-
-        mock_observatory = MagicMock()
-        mock_builder.create_observatory.return_value = mock_observatory
-
-        # Call the function under test
-        texp, validation_variables = calculate_texp(mock_parameters, False)
-
-        # Assert the results
-        assert np.array_equal(texp, np.array([1.0]))
-        assert validation_variables == {}
-
-        # Check that all expected method calls occurred
-        mock_observation.assert_called_once()
-        mock_scene.assert_called_once()
-        mock_builder.create_observatory.assert_called_once()
-        mock_calculate.assert_called_once()
-
-
-def test_calculate_snr(mock_parameters):
-    """
-    Test the calculate_snr function.
-
-    This test mocks the Observation, AstrophysicalScene, ObservatoryBuilder, and
-    calculate_exposure_time_or_snr functions. It then checks if calculate_snr
-    correctly sets up these objects and calls the calculation function.
-    """
-    with (
-        patch("pyEDITH.cli.Observation") as mock_observation,
-        patch("pyEDITH.cli.AstrophysicalScene") as mock_scene,
-        patch("pyEDITH.cli.ObservatoryBuilder") as mock_builder,
-        patch("pyEDITH.cli.calculate_exposure_time_or_snr") as mock_calculate,
-    ):
-
-        # Set up mock objects and their return values
-        mock_observation_instance = MagicMock()
-        mock_observation_instance.fullsnr = np.array([10.0])
-        mock_observation_instance.validation_variables = {}
-        mock_observation.return_value = mock_observation_instance
-
-        mock_scene_instance = MagicMock()
-        mock_scene.return_value = mock_scene_instance
-
-        mock_observatory = MagicMock()
-        mock_builder.create_observatory.return_value = mock_observatory
-
-        # Call the function under test
-        snr, validation_variables = calculate_snr(mock_parameters, 1.0)
-
-        # Assert the results
-        assert np.array_equal(snr, np.array([10.0]))
-        assert validation_variables == {}
-
-        # Check that all expected method calls occurred
-        mock_observation.assert_called_once()
-        mock_scene.assert_called_once()
-        mock_builder.create_observatory.assert_called_once()
-        mock_calculate.assert_called_once()
-
-    # modify the mock parameters to test IFS mode regridding in scene
-    mock_parameters["spectral_resolution"] = [140, 40]
-    mock_parameters["channel_bounds"] = 1.0
-    mock_parameters["regrid_wavelength"] = True
-    mock_parameters["observing_mode"] = "IFS"
-
-    with (
-        patch("pyEDITH.cli.Observation") as mock_observation,
-        patch("pyEDITH.cli.AstrophysicalScene") as mock_scene,
-        patch("pyEDITH.cli.ObservatoryBuilder") as mock_builder,
-        patch("pyEDITH.cli.calculate_exposure_time_or_snr") as mock_calculate,
-    ):
-
-        # Set up mock objects and their return values
-        mock_observation_instance = MagicMock()
-        mock_observation_instance.fullsnr = np.array([10.0])
-        mock_observation_instance.validation_variables = {}
-        mock_observation.return_value = mock_observation_instance
-
-        mock_scene_instance = MagicMock()
-        mock_scene.return_value = mock_scene_instance
-
-        mock_observatory = MagicMock()
-        mock_builder.create_observatory.return_value = mock_observatory
-
-        # Call the function under test
-        snr, validation_variables = calculate_snr(mock_parameters, 1.0)
-
-        # Assert the results
-        assert np.array_equal(snr, np.array([10.0]))
-        assert validation_variables == {}
-
-        # Check that all expected method calls occurred
-        mock_observation.assert_called_once()
-        mock_scene.assert_called_once()
-        mock_builder.create_observatory.assert_called_once()
-        mock_calculate.assert_called_once()
+# ============================================================================
+# Tests for main() - Verbosity levels
+# ============================================================================
 
 
 @patch("pyEDITH.cli.set_verbosity")
 @patch("pyEDITH.cli.parse_input.read_configuration")
 @patch("pyEDITH.cli.calculate_texp")
-def test_main_verbose_levels(
+def test_main_default_verbosity_level(
     mock_calculate_texp, mock_read_configuration, mock_set_verbosity
 ):
-    """Test that verbose flags correctly set logging levels."""
+    """Test that default verbosity (no flag) sets warning level."""
     mock_read_configuration.return_value = ({}, {})
     mock_calculate_texp.return_value = (np.array([1.0]), {})
 
-    # Test default (no flag) - should be warning level
     with patch("sys.argv", ["pyedith", "etc", "--edith", "test.edith"]):
         with patch("builtins.print"):
             main()
             mock_set_verbosity.assert_called_with("warning")
 
-    mock_set_verbosity.reset_mock()
 
-    # Test -v flag - should be info level
+@patch("pyEDITH.cli.set_verbosity")
+@patch("pyEDITH.cli.parse_input.read_configuration")
+@patch("pyEDITH.cli.calculate_texp")
+def test_main_verbose_flag_sets_info_level(
+    mock_calculate_texp, mock_read_configuration, mock_set_verbosity
+):
+    """Test that -v flag sets info verbosity level."""
+    mock_read_configuration.return_value = ({}, {})
+    mock_calculate_texp.return_value = (np.array([1.0]), {})
+
     with patch("sys.argv", ["pyedith", "-v", "etc", "--edith", "test.edith"]):
         with patch("builtins.print"):
             main()
             mock_set_verbosity.assert_called_with("info")
 
-    mock_set_verbosity.reset_mock()
+
+@patch("pyEDITH.cli.set_verbosity")
+@patch("pyEDITH.cli.parse_input.read_configuration")
+@patch("pyEDITH.cli.calculate_texp")
+def test_main_verbose_long_flag_sets_info_level(
+    mock_calculate_texp, mock_read_configuration, mock_set_verbosity
+):
+    """Test that --verbose flag sets info verbosity level."""
+    mock_read_configuration.return_value = ({}, {})
+    mock_calculate_texp.return_value = (np.array([1.0]), {})
+
     with patch("sys.argv", ["pyedith", "--verbose", "etc", "--edith", "test.edith"]):
         with patch("builtins.print"):
             main()
             mock_set_verbosity.assert_called_with("info")
 
-    mock_set_verbosity.reset_mock()
 
-    # Test -vv flag - should be debug level
+@patch("pyEDITH.cli.set_verbosity")
+@patch("pyEDITH.cli.parse_input.read_configuration")
+@patch("pyEDITH.cli.calculate_texp")
+def test_main_double_verbose_flag_sets_debug_level(
+    mock_calculate_texp, mock_read_configuration, mock_set_verbosity
+):
+    """Test that -vv flag sets debug verbosity level."""
+    mock_read_configuration.return_value = ({}, {})
+    mock_calculate_texp.return_value = (np.array([1.0]), {})
+
     with patch("sys.argv", ["pyedith", "-vv", "etc", "--edith", "test.edith"]):
         with patch("builtins.print"):
             main()
             mock_set_verbosity.assert_called_with("debug")
 
-    mock_set_verbosity.reset_mock()
 
-    # Test that --quiet flag sets error level.
+@patch("pyEDITH.cli.set_verbosity")
+@patch("pyEDITH.cli.parse_input.read_configuration")
+@patch("pyEDITH.cli.calculate_texp")
+def test_main_quiet_flag_sets_error_level(
+    mock_calculate_texp, mock_read_configuration, mock_set_verbosity
+):
+    """Test that -q flag sets error verbosity level."""
+    mock_read_configuration.return_value = ({}, {})
+    mock_calculate_texp.return_value = (np.array([1.0]), {})
+
     with patch("sys.argv", ["pyedith", "-q", "etc", "--edith", "test.edith"]):
         with patch("builtins.print"):
             main()
             mock_set_verbosity.assert_called_with("error")
 
-    mock_set_verbosity.reset_mock()
+
+@patch("pyEDITH.cli.set_verbosity")
+@patch("pyEDITH.cli.parse_input.read_configuration")
+@patch("pyEDITH.cli.calculate_texp")
+def test_main_quiet_long_flag_sets_error_level(
+    mock_calculate_texp, mock_read_configuration, mock_set_verbosity
+):
+    """Test that --quiet flag sets error verbosity level."""
+    mock_read_configuration.return_value = ({}, {})
+    mock_calculate_texp.return_value = (np.array([1.0]), {})
 
     with patch("sys.argv", ["pyedith", "--quiet", "etc", "--edith", "test.edith"]):
         with patch("builtins.print"):
             main()
             mock_set_verbosity.assert_called_with("error")
 
-    mock_set_verbosity.reset_mock()
 
-    # Both --quiet and -vv specified - quiet should win
+@patch("pyEDITH.cli.set_verbosity")
+@patch("pyEDITH.cli.parse_input.read_configuration")
+@patch("pyEDITH.cli.calculate_texp")
+def test_main_quiet_overrides_verbose(
+    mock_calculate_texp, mock_read_configuration, mock_set_verbosity
+):
+    """Test that --quiet flag takes precedence over -vv flag."""
+    mock_read_configuration.return_value = ({}, {})
+    mock_calculate_texp.return_value = (np.array([1.0]), {})
+
     with patch(
         "sys.argv", ["pyedith", "--quiet", "-vv", "etc", "--edith", "test.edith"]
     ):
         with patch("builtins.print"):
             main()
             mock_set_verbosity.assert_called_with("error")
+
+
+# ============================================================================
+# Tests for calculate_texp()
+# ============================================================================
+
+
+def test_calculate_texp_basic_execution(mock_parameters):
+    """Test that calculate_texp correctly initializes objects and returns exposure time."""
+    with (
+        patch("pyEDITH.cli.Observation") as mock_observation,
+        patch("pyEDITH.cli.AstrophysicalScene") as mock_scene,
+        patch("pyEDITH.cli.ObservatoryBuilder") as mock_builder,
+        patch("pyEDITH.cli.calculate_exposure_time_or_snr") as mock_calculate,
+    ):
+        # Set up mock objects
+        mock_observation_instance = MagicMock()
+        mock_observation_instance.exptime = np.array([1.0])
+        mock_observation_instance.validation_variables = {}
+        mock_observation.return_value = mock_observation_instance
+
+        mock_scene_instance = MagicMock()
+        mock_scene.return_value = mock_scene_instance
+
+        mock_observatory = MagicMock()
+        mock_builder.create_observatory.return_value = mock_observatory
+
+        # Execute
+        texp, validation_variables = calculate_texp(mock_parameters, False)
+
+        # Verify results
+        assert np.array_equal(texp, np.array([1.0]))
+        assert validation_variables == {}
+
+
+def test_calculate_texp_calls_all_components(mock_parameters):
+    """Test that calculate_texp calls all required component methods."""
+    with (
+        patch("pyEDITH.cli.Observation") as mock_observation,
+        patch("pyEDITH.cli.AstrophysicalScene") as mock_scene,
+        patch("pyEDITH.cli.ObservatoryBuilder") as mock_builder,
+        patch("pyEDITH.cli.calculate_exposure_time_or_snr") as mock_calculate,
+    ):
+        # Set up mock objects
+        mock_observation_instance = MagicMock()
+        mock_observation_instance.exptime = np.array([1.0])
+        mock_observation_instance.validation_variables = {}
+        mock_observation.return_value = mock_observation_instance
+
+        mock_scene_instance = MagicMock()
+        mock_scene.return_value = mock_scene_instance
+
+        mock_observatory = MagicMock()
+        mock_builder.create_observatory.return_value = mock_observatory
+
+        # Execute
+        calculate_texp(mock_parameters, False)
+
+        # Verify all components were called
+        mock_observation.assert_called_once()
+        mock_scene.assert_called_once()
+        mock_builder.create_observatory.assert_called_once()
+        mock_calculate.assert_called_once()
+
+
+def test_calculate_texp_ifs_mode_with_regridding(mock_parameters_ifs):
+    """Test that calculate_texp correctly handles IFS mode with wavelength regridding."""
+    with (
+        patch("pyEDITH.cli.Observation") as mock_observation,
+        patch("pyEDITH.cli.AstrophysicalScene") as mock_scene,
+        patch("pyEDITH.cli.ObservatoryBuilder") as mock_builder,
+        patch("pyEDITH.cli.calculate_exposure_time_or_snr") as mock_calculate,
+    ):
+        # Set up mock objects
+        mock_observation_instance = MagicMock()
+        mock_observation_instance.exptime = np.array([1.0])
+        mock_observation_instance.validation_variables = {}
+        mock_observation.return_value = mock_observation_instance
+
+        mock_scene_instance = MagicMock()
+        mock_scene.return_value = mock_scene_instance
+
+        mock_observatory = MagicMock()
+        mock_builder.create_observatory.return_value = mock_observatory
+
+        # Execute
+        texp, validation_variables = calculate_texp(mock_parameters_ifs, False)
+
+        # Verify results
+        assert np.array_equal(texp, np.array([1.0]))
+        assert validation_variables == {}
+
+        # Verify scene regridding was called
+        mock_scene_instance.regrid_spectra.assert_called_once()
+
+
+# ============================================================================
+# Tests for calculate_snr()
+# ============================================================================
+
+
+def test_calculate_snr_basic_execution(mock_parameters):
+    """Test that calculate_snr correctly initializes objects and returns SNR."""
+    with (
+        patch("pyEDITH.cli.Observation") as mock_observation,
+        patch("pyEDITH.cli.AstrophysicalScene") as mock_scene,
+        patch("pyEDITH.cli.ObservatoryBuilder") as mock_builder,
+        patch("pyEDITH.cli.calculate_exposure_time_or_snr") as mock_calculate,
+    ):
+        # Set up mock objects
+        mock_observation_instance = MagicMock()
+        mock_observation_instance.fullsnr = np.array([10.0])
+        mock_observation_instance.validation_variables = {}
+        mock_observation.return_value = mock_observation_instance
+
+        mock_scene_instance = MagicMock()
+        mock_scene.return_value = mock_scene_instance
+
+        mock_observatory = MagicMock()
+        mock_builder.create_observatory.return_value = mock_observatory
+
+        # Execute
+        snr, validation_variables = calculate_snr(mock_parameters, 1.0)
+
+        # Verify results
+        assert np.array_equal(snr, np.array([10.0]))
+        assert validation_variables == {}
+
+
+def test_calculate_snr_calls_all_components(mock_parameters):
+    """Test that calculate_snr calls all required component methods."""
+    with (
+        patch("pyEDITH.cli.Observation") as mock_observation,
+        patch("pyEDITH.cli.AstrophysicalScene") as mock_scene,
+        patch("pyEDITH.cli.ObservatoryBuilder") as mock_builder,
+        patch("pyEDITH.cli.calculate_exposure_time_or_snr") as mock_calculate,
+    ):
+        # Set up mock objects
+        mock_observation_instance = MagicMock()
+        mock_observation_instance.fullsnr = np.array([10.0])
+        mock_observation_instance.validation_variables = {}
+        mock_observation.return_value = mock_observation_instance
+
+        mock_scene_instance = MagicMock()
+        mock_scene.return_value = mock_scene_instance
+
+        mock_observatory = MagicMock()
+        mock_builder.create_observatory.return_value = mock_observatory
+
+        # Execute
+        calculate_snr(mock_parameters, 1.0)
+
+        # Verify all components were called
+        mock_observation.assert_called_once()
+        mock_scene.assert_called_once()
+        mock_builder.create_observatory.assert_called_once()
+        mock_calculate.assert_called_once()
+
+
+def test_calculate_snr_ifs_mode_with_regridding(mock_parameters_ifs):
+    """Test that calculate_snr correctly handles IFS mode with wavelength regridding."""
+    with (
+        patch("pyEDITH.cli.Observation") as mock_observation,
+        patch("pyEDITH.cli.AstrophysicalScene") as mock_scene,
+        patch("pyEDITH.cli.ObservatoryBuilder") as mock_builder,
+        patch("pyEDITH.cli.calculate_exposure_time_or_snr") as mock_calculate,
+    ):
+        # Set up mock objects
+        mock_observation_instance = MagicMock()
+        mock_observation_instance.fullsnr = np.array([10.0])
+        mock_observation_instance.validation_variables = {}
+        mock_observation.return_value = mock_observation_instance
+
+        mock_scene_instance = MagicMock()
+        mock_scene.return_value = mock_scene_instance
+
+        mock_observatory = MagicMock()
+        mock_builder.create_observatory.return_value = mock_observatory
+
+        # Execute
+        snr, validation_variables = calculate_snr(mock_parameters_ifs, 1.0)
+
+        # Verify results
+        assert np.array_equal(snr, np.array([10.0]))
+        assert validation_variables == {}
+
+        # Verify scene regridding was called
+        mock_scene_instance.regrid_spectra.assert_called_once()

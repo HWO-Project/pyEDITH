@@ -542,7 +542,7 @@ class AstrophysicalScene:
 
         Raises
         ------
-        KeyError
+        ValueError
             If a required parameter is missing from the input dictionary.
         """
 
@@ -745,11 +745,34 @@ class AstrophysicalScene:
             A dictionary containing simulation parameters including target star
             parameters, planet parameters, and observational parameters.
             Must include a "wavelength" key containing the wavelength array
+
         Returns
         -------
         None
 
+        Raises
+        ------
+        AttributeError
+            If the scene has not been properly configured (missing required attributes)
+        KeyError
+            If parameters dictionary is missing required keys
+
         """
+        # Validate that scene has been properly configured
+        required_attributes = ["vmag", "dist", "dec", "ra", "F0", "nzodis", "mag"]
+        missing_attrs = [
+            attr for attr in required_attributes if not hasattr(self, attr)
+        ]
+        if missing_attrs:
+            raise AttributeError(
+                f"AstrophysicalScene must be configured before calculating zodi/exozodi. "
+                f"Missing attributes: {', '.join(missing_attrs)}. "
+                f"Please call load_configuration() first."
+            )
+
+        # Validate parameters dictionary
+        if "wavelength" not in parameters:
+            raise KeyError("parameters dictionary must contain 'wavelength' key")
 
         # calculate flux at zero point for the V band and the prescribed lambda
 

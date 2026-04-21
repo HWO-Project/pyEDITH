@@ -151,6 +151,7 @@ def parse_input_file(
             variables["wavelength"] = spectrum_df["wavelength"].tolist()
             variables["Fstar_10pc"] = spectrum_df["Fstar_10pc"].tolist()
             variables["Fp/Fs"] = spectrum_df["Fp/Fs"].tolist()
+            variables["nlambda"] = len(spectrum_df["wavelength"].tolist())
 
         else:
             raise ValueError(

@@ -5,7 +5,16 @@ from astropy import units as u
 from pyEDITH import calculate_texp, lambda_d_to_arcsec
 from pyEDITH.units import *
 import matplotlib.pyplot as plt
+import hwostyle
 
+hwostyle.use("light")
+
+hwocolor = hwostyle.palette
+
+# Revert hwostyle changes
+plt.rcParams["axes.grid"] = False
+plt.rcParams["axes.spines.top"] = True
+plt.rcParams["axes.spines.right"] = True
 # Load HPIC
 script_dir = os.path.dirname(os.path.abspath(__file__))
 excel_file_path = os.path.join(script_dir, "ETC_cal_detect.xlsx")
@@ -292,110 +301,93 @@ import numpy as np
 from matplotlib.ticker import ScalarFormatter, FuncFormatter
 
 
-class ScientificNotationFormatter(ScalarFormatter):
-    def __init__(self, useOffset=True, useMathText=True):
-        super().__init__(useOffset=useOffset, useMathText=useMathText)
-        self.set_scientific(True)
-        self.set_powerlimits((-2, 2))
-
-    def _set_format(self):
-        self.format = "%1.1f"
-
-
 def visualize_comparisons(comparisons, name, wavelength):
     filename = name + "_" + str(wavelength)
     n_cols = 6
     n_rows = 3
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(12, 8))
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(12, 8), sharey=True)
     # fig.suptitle(f"Comparisons for {name} at {wavelength}", fontsize=20, y=1.02)
 
     axes = axes.flatten()
-
+    codes = ["EXOSIMS", "EBS", "AYO", "pyEDITH"]
+    colors = [hwocolor.cyan, hwocolor.pink, hwocolor.yellow, hwocolor.green]
+    markers = [".", ".", ".", "*"]
     for i, (key, comparison) in enumerate(comparisons.items()):
         ax = axes[i]
         x = []
         y = []
-        colors = []
-        for j, code in enumerate(["AYO", "EBS", "EXOSIMS", "pyEDITH"]):
+
+        for j, code in enumerate(codes):
+            value = (
+                comparison["pyedith"]
+                if code == "pyEDITH"
+                else comparison["values"].get(code)
+            )
+
             try:
-                if code == "pyEDITH":
-                    value = float(comparison["pyedith"])
-                else:
-                    value = float(comparison["values"][code])
+                value = float(value)
                 if not np.isnan(value):
-                    x.append(j)
-                    y.append(value)
-                    colors.append(["blue", "green", "red", "purple"][j])
-                else:
-                    ax.text(
+                    x.append(value)
+                    y.append(j)
+                    ax.scatter(
+                        value,
                         j,
-                        0.5,
-                        "X",
-                        ha="center",
-                        va="center",
-                        fontsize=16,
-                        fontweight="bold",
-                        color=["blue", "green", "red", "purple"][j],
+                        c=colors[j],
+                        marker=markers[j],
+                        s=160,
                     )
-            except ValueError:
+
+                else:
+                    raise ValueError
+            except (ValueError, TypeError):
                 ax.text(
-                    j,
                     0.5,
+                    j,
                     "X",
                     ha="center",
                     va="center",
                     fontsize=16,
                     fontweight="bold",
-                    color=["blue", "green", "red", "purple"][j],
+                    color=colors[j],
                 )
 
-        if y:
-            ax.scatter(x, y, c=colors, s=80)
-            if not np.isnan(comparison["mean"]):
-                ax.axhline(
-                    y=comparison["mean"],
-                    color="black",
-                    linestyle="--",
-                    linewidth=1,
-                    label="Mean",
-                )
-                ax.axhspan(
-                    comparison["mean"] - comparison["std"],
-                    comparison["mean"] + comparison["std"],
-                    alpha=0.2,
-                    color="gray",
-                    label="Std Dev",
-                )
+        if not np.isnan(comparison["mean"]):
+            ax.axvline(
+                comparison["mean"],
+                color="black",
+                linestyle="--",
+                linewidth=1,
+                label="Mean",
+            )
+            ax.axvspan(
+                comparison["mean"] - comparison["std"],
+                comparison["mean"] + comparison["std"],
+                alpha=0.2,
+                color="gray",
+                label="Std Dev",
+            )
+        x_min, x_max = min(x), max(x)
+        x_range = x_max - x_min
 
-            # Set y-axis limits to zoom in on the data points
-            y_min, y_max = min(y), max(y)
-            y_range = y_max - y_min
-            y_padding = 1 * y_range  # Add 100% padding
-            ax.set_ylim(y_min - y_padding, y_max + y_padding)
-
-            # Set y-axis to log scale if the values span more than 2 orders of magnitude
-            if len(set(y)) > 1:
-                if max(y) / min(y) > 100:
-                    ax.set_yscale("log")
-                    # For log scale, adjust limits to ensure all points are visible
-                    ax.set_ylim(y_min / 1.1, y_max * 1.1)
-                else:
-                    ax.set_ylim(
-                        bottom=max(0, y_min - y_padding)
-                    )  # Ensure bottom limit is not negative for linear scale
-
-            # Set custom formatter for y-axis ticks
-            formatter = ScientificNotationFormatter()
-            ax.yaxis.set_major_formatter(formatter)
-            ax.yaxis.offsetText.set_fontsize(7)
-
+        # log scale if it spans more than 2 orders of magnitude
+        if len(set(x)) > 1 and max(x) / min(x) > 100:
+            ax.set_xscale("log")
+            ax.set_xlim(x_min / 1.1, x_max * 1.1)
         else:
-            ax.text(0.5, 0.5, "No valid data", ha="center", va="center")
+            x_padding = x_range
+            ax.set_xlim(max(0, x_min - x_padding), x_max + x_padding)
+        formatter = ScalarFormatter(useMathText=True)
+        formatter.set_scientific(True)
+        formatter.set_powerlimits((-2, 2))
+        ax.xaxis.set_major_formatter(formatter)
+        ax.xaxis.offsetText.set_fontsize(9)
+        ax.ticklabel_format(style="scientific", axis="x", scilimits=(-2, 2))
 
-        ax.set_title(key, fontsize=12)
-        ax.set_xticks(range(4))
-        ax.set_xticklabels(["AYO", "EBS", "EXO", "pyE"], rotation=45, fontsize=10)
+        ax.set_xlabel(key, fontsize=12)
+        ax.set_yticks(range(4))
+        ax.set_yticklabels(codes, rotation=45, fontsize=10)
         ax.tick_params(axis="both", which="major", labelsize=10)
+        ax.invert_yaxis()
 
         # Only show legend for the first subplot
         # if i == 0:
@@ -406,7 +398,7 @@ def visualize_comparisons(comparisons, name, wavelength):
         fig.delaxes(axes[j])
 
     plt.tight_layout()
-    plt.subplots_adjust(top=0.9, hspace=0.4, wspace=0.3)
+    plt.subplots_adjust(top=0.9, hspace=0.5, wspace=0.15)
     plt.savefig(os.path.join(script_dir, filename + ".png"))
 
 
