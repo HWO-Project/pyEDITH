@@ -671,7 +671,9 @@ class CoronagraphYIP(Coronagraph):
         ), "Stellar diameter is outside bounds 0 <= diam (lam/D) < 1. Cannot interpolate Istar from YIP."
 
         stellar_diam = stellar_angular_diameter_lod.value * lod
-        if self.DEFAULT_CONFIG["az_avg"]:
+
+        setattr(self, "az_avg", parameters.get("az_avg", self.DEFAULT_CONFIG["az_avg"]))
+        if self.az_avg:
             # Radial profile projection (replaces 100x rotate-and-average)
             self.DEFAULT_CONFIG["Istar"] = (
                 yippy_obj.core_mean_intensity_map(stellar_diam) * DIMENSIONLESS
