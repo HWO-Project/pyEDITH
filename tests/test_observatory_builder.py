@@ -265,6 +265,39 @@ def test_create_component_unknown_class(mock_build_path, mock_registry):
         ObservatoryBuilder._create_component("telescopes", "Invalid", mock_registry)
 
 
+@patch("pyEDITH.observatory_builder.fetch_yip")
+def test_create_component_coronagraph_yippy_name(mock_fetch_yip, mock_registry):
+    """A coronagraph entry with `yippy_name` resolves via yippy.fetch_yip."""
+    mock_fetch_yip.return_value = "/cache/eac1_aavc_2d"
+    mock_registry["coronagraphs"]["AAVC_2D"] = {
+        "class": "CoronagraphYIP",
+        "yippy_name": "eac1_aavc_2d",
+    }
+
+    with patch.dict(os.environ, {}, clear=True):
+        coronagraph = ObservatoryBuilder._create_component(
+            "coronagraphs", "AAVC_2D", mock_registry
+        )
+
+    mock_fetch_yip.assert_called_once_with("eac1_aavc_2d")
+    assert coronagraph.path == "/cache/eac1_aavc_2d"
+    assert coronagraph.keyword == "AAVC_2D"
+
+
+def test_create_component_coronagraph_yippy_name_and_path_conflict(mock_registry):
+    """An entry with both `yippy_name` and `path` is rejected."""
+    mock_registry["coronagraphs"]["Conflict"] = {
+        "class": "CoronagraphYIP",
+        "yippy_name": "eac1_aavc_2d",
+        "path": "some_folder",
+    }
+
+    with pytest.raises(ValueError, match="both 'yippy_name' and 'path'"):
+        ObservatoryBuilder._create_component(
+            "coronagraphs", "Conflict", mock_registry
+        )
+
+
 # ============================================================================
 # Tests for ObservatoryBuilder.configure_observatory
 # ============================================================================
