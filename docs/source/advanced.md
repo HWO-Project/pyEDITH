@@ -20,8 +20,14 @@ parameters["detector_type"] = "EAC1"
 
 ## Add your own YIP coronagraph
 
-1. Add your new Coronagraph YIP folder to the YIP folder (see [Installation](installation.md)). For example, we assume this folder is called `NewCoronagraph`.
-2. Open `src/components/registry.json`. This file contains the dictionary that connects your favorite keyword to the name of the coronagraph YIP folder. It will look something like this:
+Open `src/pyEDITH/components/registry.json`. This file connects your preferred keyword to a coronagraph YIP. Each coronagraph entry uses one of two fields to describe where the YIP comes from:
+
+- **`yippy_name`** — a yippy catalog name (e.g. `eac1_aavc_2d`). The YIP is fetched from Zenodo on first use and cached locally. Browse names with `yippy.list_yips()` or see the [yippy datasets page](https://yippy.readthedocs.io/en/latest/datasets.html). This is the recommended way to add a coronagraph.
+- **`path`** — a local folder name resolved against the `YIP_CORO_DIR` environment variable. Use this for in-development YIPs that are not yet on Zenodo.
+
+Use exactly one of these fields per entry; setting both is rejected.
+
+The registry starts out looking something like this:
 
 ```json
 {
@@ -35,7 +41,7 @@ parameters["detector_type"] = "EAC1"
         "LUVOIR": {
             "class": "CoronagraphYIP",
             "path": "usort_offaxis_ovc"
-        },
+        }
     },
     "detectors": {
         "EAC1": {
@@ -46,7 +52,7 @@ parameters["detector_type"] = "EAC1"
 }
 ```
 
-3. Add to the registry the keyword and the dictionary establishing the class of the coronagraph (for all the YIP-like coronagraphs, it will be `CoronagraphYIP`) and then the name of the folder.
+Add a new entry under `"coronagraphs"` with the class `CoronagraphYIP` and either `yippy_name` (preferred) or `path` (legacy):
 
 ```json
 {
@@ -61,10 +67,14 @@ parameters["detector_type"] = "EAC1"
             "class": "CoronagraphYIP",
             "path": "usort_offaxis_ovc"
         },
-        "MyNewCoronagraph": {
+        "MyZenodoCoro": {
+            "class": "CoronagraphYIP",
+            "yippy_name": "eac1_aavc_2d"
+        },
+        "MyLocalCoro": {
             "class": "CoronagraphYIP",
             "path": "NewCoronagraph"
-        },
+        }
     },
     "detectors": {
         "EAC1": {
@@ -75,4 +85,6 @@ parameters["detector_type"] = "EAC1"
 }
 ```
 
-4. If you want to use this coronagraph, you should change the observatory preset in your parameters (see [above](advanced.md#change-a-preset)).
+`MyZenodoCoro` is auto-downloaded from Zenodo. `MyLocalCoro` is loaded from `$YIP_CORO_DIR/NewCoronagraph/`.
+
+To use a new coronagraph, set the corresponding `coronagraph_type` keyword in your parameters (see [above](advanced.md#change-a-preset)).

@@ -1,5 +1,8 @@
 import json, os
 from typing import Union
+
+from yippy import fetch_yip
+
 from pyEDITH.observatory import Observatory
 from pyEDITH.components import telescopes, coronagraphs, detectors
 
@@ -216,9 +219,23 @@ class ObservatoryBuilder:
         component_info = registry[component_type].get(keyword)
         if not component_info:
             raise ValueError(f"Unknown {component_type} keyword: {keyword}")
-        if component_info["path"] is not None:
+
+        # Coronagraphs may be sourced from the yippy catalog (Zenodo)
+        # via ``yippy_name``, or from a local folder via ``path``
+        # (resolved against YIP_CORO_DIR). Other components use ``path``.
+        yippy_name = component_info.get("yippy_name")
+        registry_path = component_info.get("path")
+        if yippy_name is not None and registry_path:
+            raise ValueError(
+                f"{component_type} entry {keyword!r} has both 'yippy_name' "
+                "and 'path'; use one or the other."
+            )
+
+        if yippy_name is not None:
+            path = fetch_yip(yippy_name)
+        elif registry_path is not None:
             path = ObservatoryBuilder.build_component_path(
-                component_type, component_info["path"]
+                component_type, registry_path
             )
         else:
             path = None
