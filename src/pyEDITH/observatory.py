@@ -289,7 +289,7 @@ class Observatory(ABC):  # abstract class
         try:
             fetched_path = fetch_yip(keyword)
             logger.info(f"Successfully downloaded coronagraph to: {fetched_path}")
-            return coronagraphs.CoronagraphYIP(path=fetched_path)
+            return coronagraphs.CoronagraphYIP(path=Path(fetched_path))
 
         except Exception as e:
             raise FileNotFoundError(

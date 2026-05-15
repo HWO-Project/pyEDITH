@@ -25,7 +25,6 @@ from pyEDITH.components.telescopes import ToyModelTelescope
 from pyEDITH.components.coronagraphs import ToyModelCoronagraph
 from pyEDITH.components.detectors import ToyModelDetector
 
-
 # ============================================================================
 # Fixtures
 # ============================================================================
@@ -420,6 +419,15 @@ def test_print_array_info_with_units():
     assert "Shape: (3,)" in output
     assert "Max value: 3" in output
     assert "Min value: 1" in output
+
+
+def test_print_array_info_none_input():
+    """Test that function returns early when None is passed."""
+    file = StringIO()
+    print_array_info(file, "none_input", None)
+    output = file.getvalue()
+    # Should produce no output when arr is None
+    assert output == ""
 
 
 def test_print_array_info_empty_numpy_array():

@@ -1,12 +1,17 @@
 import pytest
 import numpy as np
+import os
 from unittest.mock import patch, MagicMock
 from astropy import units as u
-
+from pathlib import Path
 from pyEDITH.observatory import Observatory, ObservatoryMediator
-from pyEDITH.components.telescopes import Telescope
-from pyEDITH.components.detectors import Detector
-from pyEDITH.components.coronagraphs import Coronagraph
+from pyEDITH.components.telescopes import Telescope, ToyModelTelescope, EACTelescope
+from pyEDITH.components.detectors import Detector, ToyModelDetector, EACDetector
+from pyEDITH.components.coronagraphs import (
+    Coronagraph,
+    ToyModelCoronagraph,
+    CoronagraphYIP,
+)
 from pyEDITH.observation import Observation
 from pyEDITH.astrophysical_scene import AstrophysicalScene
 from pyEDITH.units import (
@@ -30,7 +35,7 @@ from pyEDITH.units import (
     PIXEL,
     ZODI,
 )
-
+from yippy import Coronagraph as yippycoro
 
 # ============================================================================
 # Mock Component Classes
@@ -42,7 +47,6 @@ class MockTelescope(Telescope):
 
     def load_configuration(self, parameters, mediator):
         self.path = None
-        self.keyword = "ToyModel"
         self.diameter = 7.87 * u.m
         self.unobscured_area = 0.879
         self.toverhead_fixed = 8381.3 * u.s
@@ -58,7 +62,6 @@ class MockDetector(Detector):
 
     def load_configuration(self, parameters, mediator):
         self.path = None
-        self.keyword = "ToyModel"
         self.pixscale_mas = 6.55224925 * u.mas
         self.npix_multiplier = u.Quantity([1.0], DIMENSIONLESS)
         self.DC = u.Quantity([3.0e-05], DARK_CURRENT)
@@ -74,7 +77,6 @@ class MockCoronagraph(Coronagraph):
 
     def load_configuration(self, parameters, mediator):
         self.path = None
-        self.keyword = "ToyModel"
         self.pixscale = 30.0 * LAMBDA_D
         self.minimum_IWA = 1.0 * LAMBDA_D
         self.maximum_OWA = 60.0 * LAMBDA_D
@@ -219,6 +221,57 @@ def configured_mock_observatory(mock_observatory):
 
 
 # ============================================================================
+# Tests for Observatory Preset List
+# ============================================================================
+
+
+def test_observatory_presets_exist():
+    """Test that Observatory has defined presets."""
+    assert hasattr(Observatory, "PRESETS")
+    assert isinstance(Observatory.PRESETS, dict)
+    assert len(Observatory.PRESETS) > 0
+
+
+def test_observatory_presets_contain_required_keys():
+    """Test that each preset contains required component keys."""
+    required_keys = {"telescope", "coronagraph", "detector"}
+
+    for preset_name, preset_config in Observatory.PRESETS.items():
+        assert required_keys.issubset(
+            preset_config.keys()
+        ), f"Preset {preset_name} missing required keys"
+
+
+def test_observatory_toymodel_preset_definition():
+    """Test ToyModel preset is properly defined."""
+    assert "ToyModel" in Observatory.PRESETS
+    preset = Observatory.PRESETS["ToyModel"]
+
+    assert preset["telescope"] == "ToyModel"
+    assert preset["coronagraph"] == "ToyModel"
+    assert preset["detector"] == "ToyModel"
+
+
+def test_observatory_eac1_preset_definition():
+    """Test EAC1 preset is properly defined."""
+    assert "EAC1" in Observatory.PRESETS
+    preset = Observatory.PRESETS["EAC1"]
+
+    assert preset["telescope"] == "EAC1"
+    assert preset["detector"] == "EAC1"
+    # Coronagraph should be defined but we don't enforce specific value
+
+
+def test_observatory_eac5_preset_definition():
+    """Test EAC5 preset is properly defined."""
+    assert "EAC5" in Observatory.PRESETS
+    preset = Observatory.PRESETS["EAC5"]
+
+    assert preset["telescope"] == "EAC5"
+    assert preset["detector"] == "EAC5"
+
+
+# ============================================================================
 # Tests for Observatory initialization
 # ============================================================================
 
@@ -230,6 +283,325 @@ def test_observatory_init():
     assert obs.telescope is None
     assert obs.detector is None
     assert obs.coronagraph is None
+
+
+# ============================================================================
+# Tests for Observatory.create_observatory with Presets
+# ============================================================================
+
+
+def test_create_observatory_toymodel_preset():
+    """Test creating observatory with ToyModel preset."""
+    obs = Observatory()
+    obs.create_observatory("ToyModel")
+
+    assert hasattr(obs, "telescope")
+    assert hasattr(obs, "coronagraph")
+    assert hasattr(obs, "detector")
+    assert obs.telescope is not None
+    assert obs.coronagraph is not None
+    assert obs.detector is not None
+    assert isinstance(obs.telescope, ToyModelTelescope)
+    assert isinstance(obs.coronagraph, ToyModelCoronagraph)
+    assert isinstance(obs.detector, ToyModelDetector)
+
+
+def test_create_observatory_eac1_preset():
+    """Test creating observatory with EAC1 preset."""
+
+    obs = Observatory()
+    obs.create_observatory("EAC1")
+
+    assert hasattr(obs, "telescope")
+    assert hasattr(obs, "coronagraph")
+    assert hasattr(obs, "detector")
+    assert obs.telescope is not None
+    assert obs.coronagraph is not None
+    assert obs.detector is not None
+    assert isinstance(obs.telescope, EACTelescope)
+    assert isinstance(obs.coronagraph, CoronagraphYIP)
+    assert isinstance(obs.detector, EACDetector)
+
+
+def test_create_observatory_eac5_preset():
+    """Test creating observatory with EAC5 preset."""
+
+    obs = Observatory()
+    obs.create_observatory("EAC5")
+
+    assert hasattr(obs, "telescope")
+    assert hasattr(obs, "coronagraph")
+    assert hasattr(obs, "detector")
+    assert obs.telescope is not None
+    assert obs.coronagraph is not None
+    assert obs.detector is not None
+    assert isinstance(obs.telescope, EACTelescope)
+    assert isinstance(obs.coronagraph, CoronagraphYIP)
+    assert isinstance(obs.detector, EACDetector)
+
+
+def test_create_observatory_invalid_preset():
+    """Test that invalid preset raises ValueError."""
+    with pytest.raises(
+        ValueError,
+        match=r"Unknown preset: InvalidPreset\. Available presets: \['ToyModel', 'EAC1', 'EAC5'\]",
+    ):
+        obs = Observatory()
+        obs.create_observatory("InvalidPreset")
+
+
+# ============================================================================
+# Tests for Observatory.create_observatory with Custom Config
+# ============================================================================
+
+
+def test_create_observatory_custom_config():
+    """Test creating observatory with custom configuration dictionary."""
+    config = {
+        "telescope": "ToyModel",
+        "coronagraph": "ToyModel",
+        "detector": "ToyModel",
+    }
+
+    obs = Observatory()
+    obs.create_observatory(config)
+
+    assert obs.telescope is not None
+    assert obs.coronagraph is not None
+    assert obs.detector is not None
+    assert isinstance(obs.telescope, ToyModelTelescope)
+    assert isinstance(obs.coronagraph, ToyModelCoronagraph)
+    assert isinstance(obs.detector, ToyModelDetector)
+
+
+def test_create_observatory_mixed_custom_config():
+    """Test creating observatory with mixed component types."""
+
+    config = {
+        "telescope": "EAC1",
+        "coronagraph": "ToyModel",
+        "detector": "EAC1",
+    }
+
+    obs = Observatory()
+    obs.create_observatory(config)
+
+    assert obs.telescope is not None
+    assert obs.coronagraph is not None
+    assert obs.detector is not None
+    assert isinstance(obs.telescope, EACTelescope)
+    assert isinstance(obs.coronagraph, ToyModelCoronagraph)
+    assert isinstance(obs.detector, EACDetector)
+
+
+def test_create_observatory_custom_config_missing_keys():
+    """Test that missing required keys raises ValueError."""
+    incomplete_config = {"telescope": "ToyModel"}
+
+    with pytest.raises(
+        ValueError, match="Config missing required keys\: \['coronagraph', 'detector'\]"
+    ):
+        obs = Observatory()
+        obs.create_observatory(incomplete_config)
+
+
+def test_create_observatory_invalid_config_type():
+    """Test that invalid configuration type raises ValueError."""
+    with pytest.raises(ValueError, match="Invalid configuration"):
+        obs = Observatory()
+        obs.create_observatory(123)
+
+
+# ============================================================================
+# Tests for Observatory._create_telescope
+# ============================================================================
+
+
+def test_create_telescope_toymodel():
+    """Test creating ToyModel telescope."""
+    telescope = Observatory._create_telescope("ToyModel")
+    assert isinstance(telescope, ToyModelTelescope)
+    assert telescope is not None
+
+
+def test_create_telescope_eac():
+    """Test creating EAC telescope."""
+    telescope = Observatory._create_telescope("EAC1")
+    assert telescope is not None
+    assert isinstance(telescope, EACTelescope)
+
+
+def test_create_telescope_invalid_keyword():
+    """Test that invalid telescope keyword raises ValueError."""
+    with pytest.raises(
+        ValueError,
+        match="Unknown telescope type: InvalidTelescope\. Expected 'ToyModel' or 'EAC\*'",
+    ):
+        Observatory._create_telescope("InvalidTelescope")
+
+
+# ============================================================================
+# Tests for Observatory._create_detector
+# ============================================================================
+
+
+def test_create_detector_toymodel():
+    """Test creating ToyModel detector."""
+    detector = Observatory._create_detector("ToyModel")
+
+    assert detector is not None
+    assert isinstance(detector, ToyModelDetector)
+
+
+def test_create_detector_eac():
+    """Test creating EAC detector."""
+    detector = Observatory._create_detector("EAC1")
+
+    assert detector is not None
+    assert isinstance(detector, EACDetector)
+
+
+def test_create_detector_invalid_keyword():
+    """Test that invalid detector keyword raises ValueError."""
+    with pytest.raises(
+        ValueError,
+        match="Unknown detector type: InvalidDetector. Expected 'ToyModel' or 'EAC\\*'",
+    ):
+        Observatory._create_detector("InvalidDetector")
+
+
+# ============================================================================
+# Tests for Observatory._create_coronagraph Priority System
+# ============================================================================
+
+
+def test_create_coronagraph_toymodel():
+    """Test creating ToyModel coronagraph."""
+    coro = Observatory._create_coronagraph("ToyModel")
+
+    assert coro is not None
+    assert isinstance(coro, ToyModelCoronagraph)
+
+
+@patch("pyEDITH.observatory.coronagraphs.CoronagraphYIP")
+def test_create_coronagraph_priority0_yippy_object(mock_coro_yip):
+    """Test Priority 0: Pre-constructed yippy Coronagraph object."""
+    # Use spec to make isinstance() work correctly
+    mock_yippy_instance = MagicMock(spec=yippycoro)
+
+    mock_coro_yip_instance = MagicMock()
+    mock_coro_yip.return_value = mock_coro_yip_instance
+
+    coro = Observatory._create_coronagraph(mock_yippy_instance)
+
+    assert coro is not None
+    mock_coro_yip.assert_called_once_with(yippy_coro=mock_yippy_instance)
+
+
+@patch("os.path.exists")
+@patch("pathlib.Path.exists")
+@patch("pyEDITH.observatory.coronagraphs.CoronagraphYIP")
+def test_create_coronagraph_priority1_explicit_path(
+    mock_coro_yip, mock_path_exists, mock_os_exists
+):
+    """Test Priority 1: Direct path that exists."""
+    mock_path_exists.return_value = True
+    mock_os_exists.return_value = True
+
+    mock_coro_yip_instance = MagicMock()
+    mock_coro_yip.return_value = mock_coro_yip_instance
+
+    test_path = "/explicit/path/to/coronagraph"
+    coro = Observatory._create_coronagraph(test_path)
+
+    assert coro is not None
+    mock_coro_yip.assert_called_once_with(path=Path(test_path))
+
+
+@patch("os.path.exists")
+@patch("os.environ.get")
+@patch("pyEDITH.observatory.coronagraphs.CoronagraphYIP")
+def test_create_coronagraph_priority2_yip_coro_dir(
+    mock_coro_yip, mock_env_get, mock_exists
+):
+    """Test Priority 2: Check YIP_CORO_DIR environment variable."""
+
+    def exists_side_effect(path):
+        return "/yip_dir/test_coro" in str(path)
+
+    mock_exists.side_effect = exists_side_effect
+    mock_env_get.return_value = "/yip_dir"
+
+    mock_coro_yip_instance = MagicMock()
+    mock_coro_yip.return_value = mock_coro_yip_instance
+
+    coro = Observatory._create_coronagraph("test_coro")
+
+    assert coro is not None
+
+    mock_coro_yip.assert_called_once_with(path=Path("/yip_dir/test_coro"))
+
+
+@patch("os.path.exists")
+@patch("pathlib.Path.exists")
+@patch("os.environ.get")
+@patch("pyEDITH.observatory.fetch_yip")
+@patch("pyEDITH.observatory.coronagraphs.CoronagraphYIP")
+def test_create_coronagraph_priority3_remote_fetch(
+    mock_coro_yip, mock_fetch, mock_env_get, mock_path_exists, mock_os_exists
+):
+    """Test Priority 3: Remote fetch from database."""
+
+    mock_path_exists.return_value = False
+    mock_os_exists.return_value = False
+    mock_env_get.return_value = None
+    mock_fetch.return_value = "/downloaded/path/coronagraph"
+
+    mock_coro_yip_instance = MagicMock()
+    mock_coro_yip.return_value = mock_coro_yip_instance
+    coro = Observatory._create_coronagraph("remote_coronagraph")
+
+    assert coro is not None
+
+    mock_fetch.assert_called_once_with("remote_coronagraph")
+
+    mock_coro_yip.assert_called_once_with(path=Path("/downloaded/path/coronagraph"))
+
+
+@patch("os.path.exists")
+@patch("pathlib.Path.exists")
+@patch("os.environ.get")
+@patch("pyEDITH.observatory.fetch_yip")
+def test_create_coronagraph_not_found_raises_error(
+    mock_fetch, mock_env_get, mock_path_exists, mock_os_exists
+):
+    """Test that nonexistent coronagraph raises FileNotFoundError."""
+
+    mock_path_exists.return_value = False
+    mock_os_exists.return_value = False
+    mock_env_get.return_value = None
+    mock_fetch.side_effect = Exception("Not found in database")
+
+    with pytest.raises(FileNotFoundError, match="Could not find or fetch coronagraph"):
+        Observatory._create_coronagraph("nonexistent_coronagraph")
+
+
+@patch("os.path.exists")
+@patch("pathlib.Path.exists")
+@patch("os.environ.get")
+@patch("pyEDITH.observatory.fetch_yip")
+def test_create_coronagraph_error_provides_solutions(
+    mock_fetch, mock_env_get, mock_path_exists, mock_os_exists
+):
+    """Test that error message provides helpful solutions."""
+
+    mock_path_exists.return_value = False
+    mock_os_exists.return_value = False
+    mock_env_get.return_value = "/yip_dir"
+    mock_fetch.side_effect = Exception("Network error")
+
+    with pytest.raises(FileNotFoundError, match="Solutions:"):
+        Observatory._create_coronagraph("test_coro")
 
 
 # ============================================================================
@@ -516,3 +888,54 @@ def test_observatory_mediator_get_scene_parameter(
     result = mediator.get_scene_parameter("vmag")
 
     assert result == mock_scene.vmag
+
+
+# ============================================================================
+# Tests for ObservatoryBuilder.build_component_path TODO REMOVE WHEN OBSOLETE
+# ============================================================================
+
+from pyEDITH.observatory import build_component_path
+
+
+def test_build_component_path_telescope():
+    """Test building telescope component path with environment variables set."""
+    with patch.dict(
+        os.environ, {"SCI_ENG_DIR": "/sci_eng", "YIP_CORO_DIR": "/yip_coro"}
+    ):
+        result = build_component_path("telescopes", "")
+
+        assert result == "/sci_eng/"
+
+
+def test_build_component_path_coronagraph():
+    """Test building coronagraph component path with full path."""
+    with patch.dict(
+        os.environ, {"SCI_ENG_DIR": "/sci_eng", "YIP_CORO_DIR": "/yip_coro"}
+    ):
+        result = build_component_path("coronagraphs", "AAVC_coronagraph")
+
+        assert result == "/yip_coro/AAVC_coronagraph"
+
+
+def test_build_component_path_telescope_env_not_set():
+    """Test that missing SCI_ENG_DIR environment variable raises EnvironmentError."""
+    with patch.dict(os.environ, {}, clear=True):
+        with pytest.raises(
+            EnvironmentError, match="SCI_ENG_DIR environment variable not set"
+        ):
+            build_component_path("telescopes", "EAC1")
+
+
+def test_build_component_path_coronagraph_env_not_set():
+    """Test that missing YIP_CORO_DIR environment variable raises EnvironmentError."""
+    with patch.dict(os.environ, {}, clear=True):
+        with pytest.raises(
+            EnvironmentError, match="YIP_CORO_DIR environment variable not set"
+        ):
+            build_component_path("coronagraphs", "AAVC")
+
+
+def test_build_component_path_invalid_type():
+    """Test that invalid component type raises ValueError."""
+    with pytest.raises(ValueError, match="Unknown component type: unknown"):
+        build_component_path("unknown", "EAC1")
