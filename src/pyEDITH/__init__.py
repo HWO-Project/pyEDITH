@@ -110,7 +110,6 @@ def set_verbosity(level="warning"):
 from .astrophysical_scene import AstrophysicalScene
 from .observation import Observation
 from .observatory import Observatory
-from .observatory_builder import ObservatoryBuilder
 from .components.coronagraphs import Coronagraph
 from .components.telescopes import Telescope
 from .components.detectors import Detector
@@ -130,7 +129,6 @@ __all__ = [
     "AstrophysicalScene",
     "Observation",
     "Observatory",
-    "ObservatoryBuilder",
     "Telescope",
     "Coronagraph",
     "Detector",

@@ -1,4 +1,4 @@
-from pyEDITH import AstrophysicalScene, Observation, ObservatoryBuilder
+from pyEDITH import AstrophysicalScene, Observation, Observatory
 from pyEDITH import calculate_exposure_time_or_snr, parse_input
 from argparse import ArgumentParser
 import numpy as np
@@ -196,12 +196,11 @@ def calculate_texp(parameters: dict, ETC_validation: bool = False) -> np.array:
     ):
         scene.regrid_spectra(parameters, observation)
 
-    # Create and configure Observatory using ObservatoryBuilder
+    # Create and configure Observatory
     observatory_config = parse_input.get_observatory_config(parameters)
-    observatory = ObservatoryBuilder.create_observatory(observatory_config)
-    ObservatoryBuilder.configure_observatory(
-        observatory, parameters, observation, scene
-    )
+    observatory = Observatory()
+    observatory.create_observatory(observatory_config)
+    observatory.load_configuration(parameters, observation, scene)
     observatory.validate_configuration()
 
     # EXPOSURE TIME CALCULATION
@@ -260,12 +259,11 @@ def calculate_snr(parameters: dict, reference_texp: float):
     ):
         scene.regrid_spectra(parameters, observation)
 
-    # Create and configure Observatory using ObservatoryBuilder
+    # Create and configure Observatory
     observatory_config = parse_input.get_observatory_config(parameters)
-    observatory = ObservatoryBuilder.create_observatory(observatory_config)
-    ObservatoryBuilder.configure_observatory(
-        observatory, parameters, observation, scene
-    )
+    observatory = Observatory()
+    observatory.create_observatory(observatory_config)
+    observatory.load_configuration(parameters, observation, scene)
     observatory.validate_configuration()
 
     # SNR CALCULATION

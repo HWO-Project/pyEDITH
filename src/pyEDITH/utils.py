@@ -242,6 +242,8 @@ def print_array_info(
         Default is "full_info" which provides comprehensive information.
         Other modes provide more concise output
     """
+    if arr is None:
+        return
 
     if mode == "full_info":
         file.write(f"{name}:\n")
@@ -512,11 +514,15 @@ def print_all_variables(
                 ("observatory.coronagraph.pixscale", observatory.coronagraph.pixscale),
                 (
                     "observatory.coronagraph.psf_trunc_ratio",
-                    observatory.coronagraph.psf_trunc_ratio,
+                    getattr(
+                        observatory.coronagraph, "psf_trunc_ratio", None
+                    ),  # optional
                 ),
                 (
                     "observatory.coronagraph.photometric_aperture_throughput",
-                    observatory.coronagraph.photometric_aperture_throughput,
+                    getattr(
+                        observatory.coronagraph, "photometric_aperture_throughput", None
+                    ),  # optional
                 ),
                 ("observatory.coronagraph.skytrans", observatory.coronagraph.skytrans),
                 (
@@ -910,7 +916,7 @@ def regrid_spec_interp(
     input_wls: np.ndarray, input_spec: np.ndarray, new_lam: np.ndarray
 ) -> np.ndarray:
     """
-    Regrid a spectrum onto a new wavelength grid using 1D interpolation.
+    (Legacy) Regrid a spectrum onto a new wavelength grid using 1D interpolation.
 
     This function regrids a spectrum using simple linear interpolation between
     the original and new wavelength grids. This method is faster than Gaussian

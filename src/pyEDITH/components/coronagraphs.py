@@ -238,8 +238,6 @@ class ToyModelCoronagraph(Coronagraph):
     ----------
     path : str, optional
         Path to configuration files (not used in toy model)
-    keyword : str, optional
-        Keyword for configuration selection (not used in toy model)
     """
 
     DEFAULT_CONFIG = {
@@ -264,7 +262,7 @@ class ToyModelCoronagraph(Coronagraph):
         * DIMENSIONLESS,  # Set to default. It is used to limit the bandwidth if the coronagraph has a specific spectral window.
     }
 
-    def __init__(self, path: str = None, keyword: str = None):
+    def __init__(self, path: str = None):
         """
         Initialize a ToyModelCoronagraph instance.
 
@@ -272,11 +270,8 @@ class ToyModelCoronagraph(Coronagraph):
         ----------
         path : str, optional
             Path to configuration files (not used in toy model)
-        keyword : str, optional
-            Keyword for configuration selection (not used in toy model)
         """
         self.path = path
-        self.keyword = keyword
 
     def load_configuration(self, parameters: dict, mediator: object) -> None:
         """
@@ -411,8 +406,6 @@ class CoronagraphYIP(Coronagraph):
     ----------
     path : str, optional
         Path to the YIP files containing coronagraph response data
-    keyword : str, optional
-        Keyword for selecting specific configurations within the YIP
     """
 
     DEFAULT_CONFIG = {
@@ -433,9 +426,7 @@ class CoronagraphYIP(Coronagraph):
         "az_avg": True,  # azimuthally average the contrast maps and noise floor if True
     }
 
-    def __init__(
-        self, path: str = None, keyword: str = None, yippy_coro: yippycoro = None
-    ):
+    def __init__(self, path: str = None, yippy_coro: yippycoro = None):
         """
         Initialize a CoronagraphYIP instance.
 
@@ -443,8 +434,6 @@ class CoronagraphYIP(Coronagraph):
         ----------
         path : str, optional
             Path to the YIP files containing coronagraph response data
-        keyword : str, optional
-            Keyword for selecting specific configurations within the YIP
         """
 
         # Ensure that either a path or a yippy_coro is provided
@@ -454,7 +443,6 @@ class CoronagraphYIP(Coronagraph):
             raise ValueError("Only one of path or yippy_coro can be provided")
 
         self.path = path
-        self.keyword = keyword
         self.yippy_coro = yippy_coro
 
     def load_configuration(self, parameters, mediator):
@@ -672,7 +660,9 @@ class CoronagraphYIP(Coronagraph):
 
         stellar_diam = stellar_angular_diameter_lod.value * lod
 
+        # Load az_avg if the user provided it, otherwise use default
         setattr(self, "az_avg", parameters.get("az_avg", self.DEFAULT_CONFIG["az_avg"]))
+
         if self.az_avg:
             # Radial profile projection (replaces 100x rotate-and-average)
             self.DEFAULT_CONFIG["Istar"] = (

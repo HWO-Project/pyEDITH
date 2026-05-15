@@ -2,9 +2,8 @@ import pytest
 from unittest.mock import patch, MagicMock
 import numpy as np
 from pyEDITH.cli import main, calculate_texp, calculate_snr
-from pyEDITH import AstrophysicalScene, Observation, ObservatoryBuilder
+from pyEDITH import AstrophysicalScene, Observation, Observatory
 from io import StringIO
-
 
 # ============================================================================
 # Fixtures
@@ -339,7 +338,7 @@ def test_calculate_texp_basic_execution(mock_parameters):
     with (
         patch("pyEDITH.cli.Observation") as mock_observation,
         patch("pyEDITH.cli.AstrophysicalScene") as mock_scene,
-        patch("pyEDITH.cli.ObservatoryBuilder") as mock_builder,
+        patch("pyEDITH.cli.Observatory") as mock_observatory,
         patch("pyEDITH.cli.calculate_exposure_time_or_snr") as mock_calculate,
     ):
         # Set up mock objects
@@ -351,8 +350,8 @@ def test_calculate_texp_basic_execution(mock_parameters):
         mock_scene_instance = MagicMock()
         mock_scene.return_value = mock_scene_instance
 
-        mock_observatory = MagicMock()
-        mock_builder.create_observatory.return_value = mock_observatory
+        mock_observatory_instance = MagicMock()
+        mock_observatory.return_value = mock_observatory_instance
 
         # Execute
         texp, validation_variables = calculate_texp(mock_parameters, False)
@@ -367,7 +366,7 @@ def test_calculate_texp_calls_all_components(mock_parameters):
     with (
         patch("pyEDITH.cli.Observation") as mock_observation,
         patch("pyEDITH.cli.AstrophysicalScene") as mock_scene,
-        patch("pyEDITH.cli.ObservatoryBuilder") as mock_builder,
+        patch("pyEDITH.cli.Observatory") as mock_observatory,
         patch("pyEDITH.cli.calculate_exposure_time_or_snr") as mock_calculate,
     ):
         # Set up mock objects
@@ -379,8 +378,8 @@ def test_calculate_texp_calls_all_components(mock_parameters):
         mock_scene_instance = MagicMock()
         mock_scene.return_value = mock_scene_instance
 
-        mock_observatory = MagicMock()
-        mock_builder.create_observatory.return_value = mock_observatory
+        mock_observatory_instance = MagicMock()
+        mock_observatory.return_value = mock_observatory_instance
 
         # Execute
         calculate_texp(mock_parameters, False)
@@ -388,7 +387,6 @@ def test_calculate_texp_calls_all_components(mock_parameters):
         # Verify all components were called
         mock_observation.assert_called_once()
         mock_scene.assert_called_once()
-        mock_builder.create_observatory.assert_called_once()
         mock_calculate.assert_called_once()
 
 
@@ -397,7 +395,7 @@ def test_calculate_texp_ifs_mode_with_regridding(mock_parameters_ifs):
     with (
         patch("pyEDITH.cli.Observation") as mock_observation,
         patch("pyEDITH.cli.AstrophysicalScene") as mock_scene,
-        patch("pyEDITH.cli.ObservatoryBuilder") as mock_builder,
+        patch("pyEDITH.cli.Observatory") as mock_observatory,
         patch("pyEDITH.cli.calculate_exposure_time_or_snr") as mock_calculate,
     ):
         # Set up mock objects
@@ -409,8 +407,8 @@ def test_calculate_texp_ifs_mode_with_regridding(mock_parameters_ifs):
         mock_scene_instance = MagicMock()
         mock_scene.return_value = mock_scene_instance
 
-        mock_observatory = MagicMock()
-        mock_builder.create_observatory.return_value = mock_observatory
+        mock_observatory_instance = MagicMock()
+        mock_observatory.return_value = mock_observatory_instance
 
         # Execute
         texp, validation_variables = calculate_texp(mock_parameters_ifs, False)
@@ -433,7 +431,7 @@ def test_calculate_snr_basic_execution(mock_parameters):
     with (
         patch("pyEDITH.cli.Observation") as mock_observation,
         patch("pyEDITH.cli.AstrophysicalScene") as mock_scene,
-        patch("pyEDITH.cli.ObservatoryBuilder") as mock_builder,
+        patch("pyEDITH.cli.Observatory") as mock_observatory,
         patch("pyEDITH.cli.calculate_exposure_time_or_snr") as mock_calculate,
     ):
         # Set up mock objects
@@ -445,8 +443,8 @@ def test_calculate_snr_basic_execution(mock_parameters):
         mock_scene_instance = MagicMock()
         mock_scene.return_value = mock_scene_instance
 
-        mock_observatory = MagicMock()
-        mock_builder.create_observatory.return_value = mock_observatory
+        mock_observatory_instance = MagicMock()
+        mock_observatory.return_value = mock_observatory_instance
 
         # Execute
         snr, validation_variables = calculate_snr(mock_parameters, 1.0)
@@ -461,7 +459,7 @@ def test_calculate_snr_calls_all_components(mock_parameters):
     with (
         patch("pyEDITH.cli.Observation") as mock_observation,
         patch("pyEDITH.cli.AstrophysicalScene") as mock_scene,
-        patch("pyEDITH.cli.ObservatoryBuilder") as mock_builder,
+        patch("pyEDITH.cli.Observatory") as mock_observatory,
         patch("pyEDITH.cli.calculate_exposure_time_or_snr") as mock_calculate,
     ):
         # Set up mock objects
@@ -473,8 +471,8 @@ def test_calculate_snr_calls_all_components(mock_parameters):
         mock_scene_instance = MagicMock()
         mock_scene.return_value = mock_scene_instance
 
-        mock_observatory = MagicMock()
-        mock_builder.create_observatory.return_value = mock_observatory
+        mock_observatory_instance = MagicMock()
+        mock_observatory.return_value = mock_observatory_instance
 
         # Execute
         calculate_snr(mock_parameters, 1.0)
@@ -482,7 +480,7 @@ def test_calculate_snr_calls_all_components(mock_parameters):
         # Verify all components were called
         mock_observation.assert_called_once()
         mock_scene.assert_called_once()
-        mock_builder.create_observatory.assert_called_once()
+        mock_observatory.assert_called_once()
         mock_calculate.assert_called_once()
 
 
@@ -491,7 +489,7 @@ def test_calculate_snr_ifs_mode_with_regridding(mock_parameters_ifs):
     with (
         patch("pyEDITH.cli.Observation") as mock_observation,
         patch("pyEDITH.cli.AstrophysicalScene") as mock_scene,
-        patch("pyEDITH.cli.ObservatoryBuilder") as mock_builder,
+        patch("pyEDITH.cli.Observatory") as mock_observatory,
         patch("pyEDITH.cli.calculate_exposure_time_or_snr") as mock_calculate,
     ):
         # Set up mock objects
@@ -503,8 +501,8 @@ def test_calculate_snr_ifs_mode_with_regridding(mock_parameters_ifs):
         mock_scene_instance = MagicMock()
         mock_scene.return_value = mock_scene_instance
 
-        mock_observatory = MagicMock()
-        mock_builder.create_observatory.return_value = mock_observatory
+        mock_observatory_instance = MagicMock()
+        mock_observatory.return_value = mock_observatory_instance
 
         # Execute
         snr, validation_variables = calculate_snr(mock_parameters_ifs, 1.0)
