@@ -12,22 +12,21 @@ source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
 ```
 git clone https://github.com/HWO-GOMAP-Working-Groups/Sci-Eng-Interface/tree/main
 ```
+>[!warning] This will deprecate in v2.0.
 
-2. Create a folder containing the "Yield Input Packages" for your preferred coronagraph. Some of these files will be available soon on the Sci-Eng-Interface GitHub, but if you need one in the meantime, [send us an email](mailto:eleonora.alei@nasa.gov).
+2. (Optional) Create a folder containing the "Yield Input Packages". More information on the [Coronagraph (YIP) Guide](yippy_guide.md).
+
+3. Install pyEDITH via command line:
 
 ```
-mkdir /path/to/yip/folder
+pip install pyedith
 ```
 
-2. Clone the pyEDITH repository:
+Alternatively, you can clone the pyEDITH repository and install it:
 
 ```
 git clone https://github.com/eleonoraalei/pyEDITH.git
 cd pyEDITH
-```
-
-3. Install the package:
-```
 pip install -e .
 ```
 
@@ -35,7 +34,12 @@ pip install -e .
 
 ```
 export SCI_ENG_DIR="/path/to/Sci-Eng-Interface/hwo_sci_eng"
+```
+And, if you created the YIP folder,
+
+```
 export YIP_CORO_DIR="/path/to/yip/folder"
 ```
+
 Replace the paths with the actual paths on your system.
 
