@@ -20,7 +20,7 @@ Here, 100000 is the exposure time in seconds.
 ```
 pyedith etc2snr --edith path/to/your/config.edith
 ```
-In this case, the config file will need to also have a secondary set of parameters (see e.g. `inputs/input_secondarybandpass.edith`)
+In this case, the config file will need to also have a secondary set of parameters (see e.g. `inputs/input_eac1.edith`)
 
 Add the -v flag to any command for verbose output:
 
@@ -29,6 +29,6 @@ pyedith etc --edith path/to/your/config.edith -v
 ```
 
 
-## Running pyEDITH from Python
+## Running pyEDITH from Python (preferred)
 
 This mode offers much more flexibility to run the ETC. We refer to our tutorials (up next in this documentation, or in the `tutorials/` folder).

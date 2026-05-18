@@ -18,7 +18,6 @@ from pyEDITH.units import (
 from unittest.mock import patch, MagicMock
 import logging
 
-
 # ============================================================================
 # Mock Objects and Fixtures
 # ============================================================================
@@ -122,7 +121,6 @@ def test_toy_model_coronagraph_init():
     coronagraph = ToyModelCoronagraph()
 
     assert coronagraph.path is None
-    assert coronagraph.keyword is None
 
 
 # ============================================================================
@@ -513,10 +511,9 @@ def test_toy_model_load_configuration_default_noisefloor_factor(caplog):
 
 def test_coronagraph_yip_init_with_path():
     """Test CoronagraphYIP initialization with path."""
-    coronagraph = CoronagraphYIP(path="test_path", keyword="usort")
+    coronagraph = CoronagraphYIP(path="test_path")
 
     assert coronagraph.path == "test_path"
-    assert coronagraph.keyword == "usort"
     assert coronagraph.yippy_coro is None
 
 
@@ -526,7 +523,6 @@ def test_coronagraph_yip_init_with_yippy_coro(yippy_coronagraph):
 
     assert coronagraph.yippy_coro is yippy_coronagraph
     assert coronagraph.path is None
-    assert coronagraph.keyword is None
 
 
 def test_coronagraph_yip_init_requires_path_or_yippy():

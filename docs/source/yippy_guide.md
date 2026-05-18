@@ -1,60 +1,163 @@
 # Coronagraph (YIP) Guide
 
-pyEDITH models coronagraphs using `CoronagraphYIP`, a wrapper around
-[yippy](https://yippy.readthedocs.io)'s `Coronagraph` class. `yippy` handles
-loading the Yield Input Package (YIP) FITS files and computing performance
-curves (throughput, contrast, core area). `CoronagraphYIP` extracts the
-quantities pyEDITH needs for exposure time calculations: the noise floor,
-stellar intensity maps, and the off-axis PSF.
+During the LUVOIR and HabEx studies a standard "handshake" between coronagraph
+designers and yield modelers was created called a "Yield Input Package" or YIP
+([see the definition here](https://starkspace.com/yield_standards.pdf)).
+pyEDITH uses YIPs to represent coronagraphs and compute the necessary
+performance metrics.
 
-## Two ways to initialize
+## Modeling the coronagraph
 
-`CoronagraphYIP` can be initialized with either a **path** to a YIP directory
-or a **pre-constructed** `yippy.Coronagraph` object:
+A coronagraphic exposure time calculation needs various
+quantities to represent the coronagraph, primarily: 
+- How much planet light reaches the detector
+- How big a photometric aperture to integrate it over
+- How much stellar leakage contaminates that aperture
+- How much extended-source emission (zodi, exozodi) gets through.
+All four of those quantities are calculated from the same underlying FITS files that
+compose a YIP.
+
+To avoid repeated code pyEDITH uses [yippy](https://yippy.readthedocs.io) to
+read YIPs and calculate [coronagraph performance
+metrics](https://yippy.readthedocs.io/en/latest/examples/00_Performance_Metrics_Overview.html).
+pyEDITH's `CoronagraphYIP` is a thin wrapper that calls yippy for the
+quantities below and exposes them in the form pyEDITH's noise budget expects.
+
+## Finding a YIP
+
+yippy currently ships a minimal two-entry catalog of YIPs hosted as
+assets on a tagged GitHub release of the yippy repo. Long-term YIP
+hosting will be provided by ExEP, and once that catalog comes online
+the discovery API will route through it. For now, browse the
+local catalog with `yippy.list_yips()`, or view the rendered table on
+the [yippy datasets page](https://yippy.readthedocs.io/en/latest/datasets.html).
+To pull a specific YIP, pass its catalog name to `fetch_yip`, which
+downloads the archive on first call and serves it from a local cache on
+subsequent calls.
 
 ```python
+from yippy import list_yips, fetch_yip
+
+list_yips()                  # all available names (currently two)
+list_yips(telescope="eac1")  # narrow by telescope, coronagraph, or sampling
+yip_path = fetch_yip("eac1_aavc_2d")
+```
+
+For in-development YIPs that are not in the catalog, drop the YIP
+folder somewhere on disk and point the `YIP_CORO_DIR` environment
+variable at it. pyEDITH will pick it up when a `coronagraph_type` value
+matches the folder name (see [Where the YIP comes
+from](#where-the-yip-comes-from) below).
+
+## Coronagraph quantities in the ETC
+
+These yippy outputs feed directly into pyEDITH's exposure time
+calculation. Each link below points to the relevant documentation
+page for definitions and examples.
+
+- **Photometric aperture throughput** (`yippy_obj.throughput_map()`):
+  fraction of planet light captured in the photometric aperture at each
+  separation, set by `psf_trunc_ratio` (default 0.3 captures the
+  off-axis PSF down to 30% of its peak). See
+  [Core Throughput](https://yippy.readthedocs.io/en/latest/examples/01_Core_Throughput.html).
+- **Photometric aperture solid angle**,
+  {math}`\Omega` (`yippy_obj.core_area_map()`): size of the aperture,
+  in {math}`(\lambda/D)^2`. Also set by `psf_trunc_ratio`, and used to
+  convert background surface brightness (zodi, exozodi) into a count
+  rate. See
+  [Spatial Metrics and Backgrounds](https://yippy.readthedocs.io/en/latest/examples/03_Spatial_Metrics_and_Backgrounds.html).
+- **Stellar intensity at the planet location**,
+  {math}`I_*` (`yippy_obj.core_mean_intensity_map(stellar_diam)` for
+  the fast radially-averaged form, or `yippy_obj.stellar_intens(stellar_diam)`
+  for the full 2D map): residual starlight leaking through the
+  coronagraph, which sets the stellar speckle background. See
+  [Stellar Leakage and Contrast](https://yippy.readthedocs.io/en/latest/examples/02_Stellar_Leakage_and_Contrast.html).
+- **Sky transmission map** (`yippy_obj.sky_trans()`): throughput for
+  extended emission as a function of position, multiplied into zodi and
+  exozodi count rates so they pick up the coronagraph mask geometry.
+- **Separation grid** (`yippy_obj.separation_map()`): radial separation
+  in {math}`\lambda/D` at every pixel, used to evaluate the maps above
+  at the planet's position.
+- **YIP header geometry** (`yippy_obj.header`): pixel scale, image
+  size, and occulter center. Used to map between pixel space and
+  {math}`\lambda/D` for the rest of the pipeline.
+
+`CoronagraphYIP` exposes these as numpy arrays on the configured
+observatory, and from that point on the exposure time calculator does
+not need to know that yippy exists.
+
+## Recommended pattern: load once, pass everywhere
+
+The single biggest performance win is to construct a
+`yippy.Coronagraph` **once** and reuse it for every pyEDITH call.
+Re-loading a YIP from FITS for every target costs ~250 ms per call.
+Reusing a pre-loaded `Coronagraph` is ~21 ms per call (a ~12x speedup),
+and the exposure time is identical.
+
+```python
+from yippy import Coronagraph, fetch_yip
 from pyEDITH.components.coronagraphs import CoronagraphYIP
 
-# From a YIP directory (yippy loads FITS files internally)
-coronagraph = CoronagraphYIP(path="/path/to/yip")
+# Fetch the YIP (downloaded from the yippy GitHub release on first
+# call, cached after).
+# See https://yippy.readthedocs.io/en/latest/datasets.html for catalog.
+yip_path = fetch_yip("eac1_aavc_2d")
 
-# From a pre-constructed yippy.Coronagraph
-from yippy import Coronagraph
-coro = Coronagraph("/path/to/yip", psf_trunc_ratio=0.3)
-coronagraph = CoronagraphYIP(yippy_coro=coro)
-```
+# Build the yippy.Coronagraph once.
+coro = Coronagraph(yip_path, psf_trunc_ratio=0.3)
 
-Both produce identical results. The difference is performance when called
-repeatedly.
-
-## Best practices for loops
-
-When calling pyEDITH in a loop (e.g. sweeping over a target catalog)
-the path-based approach reconstructs the `yippy.Coronagraph` from FITS on every
-call:
-
-```python
-for target_params in catalog:
-    coronagraph = CoronagraphYIP(path="/path/to/yip")
-    # ~250 ms per call (FITS I/O + performance curve computation)
-```
-
-Pre-loading the coronagraph once and reusing it avoids this overhead:
-
-```python
-from yippy import Coronagraph
-
-coro = Coronagraph("/path/to/yip", psf_trunc_ratio=0.3)
-
+# Pass it into pyEDITH for every target.
 for target_params in catalog:
     coronagraph = CoronagraphYIP(yippy_coro=coro)
-    # ~21 ms per call (skips FITS I/O entirely)
+    # ... run pyEDITH using `coronagraph` ...
 ```
 
-**Speedup: ~12x per call.** Both approaches produce identical exposure times.
+To switch `psf_trunc_ratio` mid-sweep without reloading from disk:
 
-```{note}
-To switch `psf_trunc_ratio` mid-sweep without reloading from disk, use
-`coro.set_psf_trunc_ratio(new_ratio)`. Results are cached to
-`yippy_cache/performance/` for reuse.
+```python
+coro.set_psf_trunc_ratio(0.5)
 ```
+
+Performance-curve results are cached to `yippy_cache/performance/` and
+reused on subsequent calls with the same ratio. The trade-offs across
+different ratios are covered in
+[Aperture Methods Comparison](https://yippy.readthedocs.io/en/latest/examples/05_Aperture_Methods_Comparison.html).
+
+## Other ways to initialize
+
+`CoronagraphYIP` can also be initialized with a path to a YIP
+directory, which is convenient for one-shot calls but reloads the YIP
+from FITS each time.
+
+```python
+# Catalog name -- yippy downloads + caches the YIP for you.
+coronagraph = CoronagraphYIP(path=fetch_yip("eac1_aavc_2d"))
+
+# A folder on disk (e.g. an in-development YIP not in the catalog).
+coronagraph = CoronagraphYIP(path="/path/to/yip")
+```
+
+For loops, prefer the pre-constructed `Coronagraph` pattern shown
+above.
+
+## Where the YIP comes from
+
+When you build an Observatory with `create_observatory`, the
+`coronagraph_type` field controls how the YIP is loaded. pyEDITH
+resolves it in this priority order:
+
+1. **Pre-constructed `yippy.Coronagraph` object.** If you have already
+   built a `Coronagraph` and want to reuse it across many targets, pass
+   the object directly. See
+   [Recommended pattern](#recommended-pattern-load-once-pass-everywhere)
+   above for why this is preferred.
+2. **Direct path on disk.** A `coronagraph_type` value that resolves
+   to an existing directory is loaded as a YIP.
+3. **`YIP_CORO_DIR` lookup.** A bare name is joined with the
+   `YIP_CORO_DIR` environment variable and checked next. Use this for
+   in-development YIPs that are not in the yippy catalog.
+4. **Remote fetch via yippy.** As a last resort, the name is passed to
+   `yippy.fetch_yip`, which downloads the YIP from the yippy repo's
+   GitHub release assets and caches it locally. Browse names with
+   `yippy.list_yips()` or the
+   [yippy datasets page](https://yippy.readthedocs.io/en/latest/datasets.html).

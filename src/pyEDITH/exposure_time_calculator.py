@@ -940,7 +940,7 @@ def calculate_exposure_time_or_snr(
                     * observatory.coronagraph.omega_lod[
                         int(np.floor(iy)), int(np.floor(ix)), iratio
                     ].value
-                )
+                ).item()
 
                 observation.photon_counts["omega_lod"][ilambd] = (
                     observatory.coronagraph.omega_lod[
@@ -1004,11 +1004,11 @@ def calculate_exposure_time_or_snr(
                 CRnf_ez *= observatory.coronagraph.omega_lod[
                     int(np.floor(iy)), int(np.floor(ix)), iratio
                 ]
-                observation.photon_counts["CRnf_ez"][ilambd] = CRnf_ez.value
+                observation.photon_counts["CRnf_ez"][ilambd] = CRnf_ez.value.item()
 
                 # total noisefloor
                 CRnf = np.sqrt(CRnf_s**2 + CRnf_ez**2)
-                observation.photon_counts["CRnf"][ilambd] = CRnf.value
+                observation.photon_counts["CRnf"][ilambd] = CRnf.value.item()
 
                 # NOTE: noisefloor_interp: technically the Y axis
                 # is rows and the X axis is columns,
@@ -1077,7 +1077,7 @@ def calculate_exposure_time_or_snr(
                         * observatory.coronagraph.omega_lod[
                             int(np.floor(iy)), int(np.floor(ix)), iratio
                         ].value
-                    )
+                    ).item()
 
                     # Calculate CRbbin
                     CRbbin = calculate_CRbbin(
@@ -1118,7 +1118,7 @@ def calculate_exposure_time_or_snr(
                         t_photon_count,
                     )
 
-                    observation.photon_counts["CRbd"][ilambd] = float(CRbd.value)
+                    observation.photon_counts["CRbd"][ilambd] = CRbd.value.item()
 
                     CRbth = calculate_CRbth(
                         observation.wavelength[ilambd],
@@ -1143,7 +1143,7 @@ def calculate_exposure_time_or_snr(
                     ) * observatory.coronagraph.omega_lod[
                         int(np.floor(iy)), int(np.floor(ix)), iratio
                     ]
-                    observation.photon_counts["CRb"][ilambd] = float(CRb.value)
+                    observation.photon_counts["CRb"][ilambd] = CRb.value.item()
 
                     # Add detector noise
                     CRb += CRbd
@@ -1170,7 +1170,7 @@ def calculate_exposure_time_or_snr(
                             * cp
                             * observatory.telescope.toverhead_multi
                             + observatory.telescope.toverhead_fixed
-                        )  # record exposure time with overheads
+                        ).item()  # record exposure time with overheads
 
                         # UNITS:
                         # []^2*[s/electron]*[]+[s] == [s]
@@ -1219,9 +1219,15 @@ def calculate_exposure_time_or_snr(
                         # )
                         # rewrote the above equation to properly evaluate the SNR when time = inf
                         observation.fullsnr[ilambd] = (
-                            np.sqrt(CRp**2 / (1 * ELECTRON / time_factors + CRnf**2))
-                            * DIMENSIONLESS
-                        ).decompose()  # Ensure all units are simplified
+                            (
+                                np.sqrt(
+                                    CRp**2 / (1 * ELECTRON / time_factors + CRnf**2)
+                                )
+                                * DIMENSIONLESS
+                            )
+                            .decompose()
+                            .item()
+                        )  # Ensure all units are simplified
 
                         # UNITS:
                         # ([s^2/electron]*[electron/s]^2)/([electron]+[s^2/electron]*[electron/s]^2)=

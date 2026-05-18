@@ -362,11 +362,18 @@ def parse_parameters(parameters: dict, nlambda: int = None) -> dict:
         "coronagraph_type",
         "detector_type",
         "observing_mode",
-        "regrid_wavelength",
     ]:
 
         if key in parameters.keys():
             parsed_params[key] = parameters[key]
+
+    # Handle boolean parameter
+    if "regrid_wavelength" in parameters.keys():
+        value = parameters["regrid_wavelength"]
+        if isinstance(value, str):
+            parsed_params["regrid_wavelength"] = value.lower() in ("true", "1", "yes")
+        else:
+            parsed_params["regrid_wavelength"] = bool(value)
 
     return parsed_params
 

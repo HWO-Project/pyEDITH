@@ -30,16 +30,6 @@
 
    ```
 
-   ```{eval-rst}
-   .. automodule:: pyEDITH.observatory_builder
-      :members:
-      :undoc-members:
-      :show-inheritance:
-      :member-order: bysource
-      :exclude-members: DEFAULT_CONFIG, PRESETS, TOY_MODEL_COMPONENTS
-
-
-   ```
 
    ```{eval-rst}
    .. automodule:: pyEDITH.components.telescopes
