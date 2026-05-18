@@ -20,17 +20,17 @@ CRb_multiplier  = 2.          ; factor to multiply to remove background
 psf_trunc_ratio = 0.35      ; truncation ratio of the PSF 
 
 ;--- STAR PARAMETERS ---
-distance = 14.8           ;   distance to star (pc)
-FstarV_10pc = 1.244e+02     ; flux in the V band (ph/s/cm^2/nm)
-Fstar_10pc = 1.128e+02     ; flux in the V band (ph/s/cm^2/nm)
-stellar_radius = 0.95            ;   stellar radius (R_sun)
+distance = 10.          ;   distance to star (pc)
+Fstar_10pc =  122.9279                 ; stellar flux at 10 pc at lambda in ph/s/cm^2/nm 
+FstarV_10pc =  115.59984                 ; stellar flux at 10 pc at the V band in ph/s/cm^2/nm 
+stellar_radius = 1           ;   stellar radius (R_sun)
 nzodis = 3.0              ;  amount of exozodi around target star ("zodis")
 ra = 236.0075773682300       ;   right ascension of target star used to estimate zodi (deg) 
 dec = 02.5151668316500      ;   declination of target star used to estimate zodi (deg)
 
 ;--- PLANET PARAMETERS ---
-separation = 0.0628       ;   separation of planet (arcsec)
-Fp/Fs =  6.3e-8                 ; planet flux at lambda in ph/s/cm^2/nm 
+separation = 0.1      ;   separation of planet (arcsec)
+Fp/Fs =  1e-10                 ; planet flux at lambda in ph/s/cm^2/nm 
 Fp_min/Fs =  1e-10                 ; minimum planet flux that can be detected at lambda in ph/s/cm^2/nm 
 
 ;--- OBSERVATORY PARAMETERS ----

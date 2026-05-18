@@ -78,7 +78,7 @@ class Observation:
             )  # wavelength # nlambd array #unit: micron
         elif (
             parameters["observing_mode"] == "IFS"
-            and parameters["regrid_wavelength"] is False
+            and bool(parameters["regrid_wavelength"]) is False
         ):
             self.wavelength = (
                 parameters["wavelength"] * WAVELENGTH
@@ -99,7 +99,7 @@ class Observation:
 
         elif (
             parameters["observing_mode"] == "IFS"
-            and parameters["regrid_wavelength"] is True
+            and bool(parameters["regrid_wavelength"]) is True
         ):
             logger.info("Calculating a new wavelength grid and re-gridding spectra...")
             if "spectral_resolution" not in parameters.keys():

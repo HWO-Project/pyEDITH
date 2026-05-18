@@ -9,7 +9,6 @@ import logging
 from pyEDITH.parse_input import *
 from pyEDITH.units import WAVELENGTH, DIMENSIONLESS, LENGTH
 
-
 # ============================================================================
 # Fixtures - Temporary input files
 # ============================================================================
@@ -19,8 +18,7 @@ from pyEDITH.units import WAVELENGTH, DIMENSIONLESS, LENGTH
 def sample_input_file():
     """Fixture providing a sample input file with valid parameters."""
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".edith") as tmp:
-        tmp.write(
-            """
+        tmp.write("""
         ; This is a comment
         wavelength = 0.5
         distance = 10
@@ -28,8 +26,7 @@ def sample_input_file():
         nzodis = 3.0
         observing_mode = IMAGER
         secondary_wavelength = 1.0
-        """
-        )
+        """)
         tmp.flush()
         yield tmp.name
     os.unlink(tmp.name)
@@ -39,16 +36,14 @@ def sample_input_file():
 def sample_input_file_imager_multi_wavelength():
     """Fixture providing an IMAGER mode input file with multiple wavelengths (invalid)."""
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".edith") as tmp:
-        tmp.write(
-            """
+        tmp.write("""
         ; This is a comment
         wavelength = [0.5, 0.6]
         distance = 10
         magV = 5.0
         nzodis = 3.0
         observing_mode = IMAGER
-        """
-        )
+        """)
         tmp.flush()
         yield tmp.name
     os.unlink(tmp.name)
@@ -58,14 +53,12 @@ def sample_input_file_imager_multi_wavelength():
 def ifs_input_file_valid():
     """Fixture providing a valid IFS mode input file."""
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".edith") as tmp:
-        tmp.write(
-            """
+        tmp.write("""
         observing_mode = 'IFS'
         wavelength = [0.5, 0.6, 0.7]
         Fstar_10pc = [1e-8, 1e-8, 1e-8]
         Fp/Fs = [1e-10, 1e-10, 1e-10]
-        """
-        )
+        """)
         tmp.flush()
         yield tmp.name
     os.unlink(tmp.name)
@@ -75,11 +68,9 @@ def ifs_input_file_valid():
 def ifs_input_file_missing_keys():
     """Fixture providing an IFS mode input file with missing required keys."""
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".edith") as tmp:
-        tmp.write(
-            """
+        tmp.write("""
         observing_mode = 'IFS'
-        """
-        )
+        """)
         tmp.flush()
         yield tmp.name
     os.unlink(tmp.name)
@@ -89,14 +80,12 @@ def ifs_input_file_missing_keys():
 def ifs_input_file_mismatched_lengths():
     """Fixture providing an IFS mode input file with mismatched column lengths."""
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".edith") as tmp:
-        tmp.write(
-            """
+        tmp.write("""
         observing_mode = 'IFS'
         wavelength = [0.5, 0.6, 0.7]
         Fstar_10pc = [1e-8, 1e-8]
         Fp/Fs = [1e-10, 1e-10, 1e-10]
-        """
-        )
+        """)
         tmp.flush()
         yield tmp.name
     os.unlink(tmp.name)
@@ -225,12 +214,10 @@ def test_parse_input_file_ifs_mismatched_lengths(ifs_input_file_mismatched_lengt
 def test_parse_input_file_invalid_spectrum_file():
     """Test that non-existent spectrum file raises FileNotFoundError."""
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".edith") as tmp:
-        tmp.write(
-            """
+        tmp.write("""
         observing_mode = "IFS"
         spectrum_file = 'nonexistent_file.csv'
-        """
-        )
+        """)
         tmp.flush()
 
         with pytest.raises(
@@ -244,12 +231,10 @@ def test_parse_input_file_invalid_spectrum_file():
 def test_parse_input_file_spectrum_file_invalid_columns(spectrum_file_invalid_columns):
     """Test that spectrum file with incorrect number of columns raises ValueError."""
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".edith") as tmp:
-        tmp.write(
-            f"""
+        tmp.write(f"""
         observing_mode = 'IFS'
         spectrum_file = '{spectrum_file_invalid_columns}'
-        """
-        )
+        """)
         tmp.flush()
 
         with pytest.raises(
@@ -263,12 +248,10 @@ def test_parse_input_file_spectrum_file_invalid_columns(spectrum_file_invalid_co
 def test_parse_input_file_spectrum_file_non_numeric(spectrum_file_non_numeric):
     """Test that spectrum file with non-numeric values raises ValueError."""
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".edith") as tmp:
-        tmp.write(
-            f"""
+        tmp.write(f"""
         observing_mode = 'IFS'
         spectrum_file = '{spectrum_file_non_numeric}'
-        """
-        )
+        """)
         tmp.flush()
 
         with pytest.raises(
@@ -287,12 +270,10 @@ def test_parse_input_file_spectrum_file_non_numeric(spectrum_file_non_numeric):
 def test_parse_input_file_with_valid_spectrum_file(valid_spectrum_file):
     """Test parsing input file with valid spectrum file."""
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".edith") as tmp:
-        tmp.write(
-            f"""
+        tmp.write(f"""
         observing_mode = 'IFS'
         spectrum_file = '{valid_spectrum_file}'
-        """
-        )
+        """)
         tmp.flush()
 
         variables, _ = parse_input_file(tmp.name, secondary_flag=False)
@@ -589,7 +570,6 @@ def test_parse_parameters_observatory_specs():
         "coronagraph_type",
         "detector_type",
         "observing_mode",
-        "regrid_wavelength",
     ]
 
     for spec in observatory_specs:
@@ -597,6 +577,45 @@ def test_parse_parameters_observatory_specs():
 
         assert parsed[spec] == "TestSpec"
         assert isinstance(parsed[spec], str)
+
+
+def test_parse_parameters_regrid_wavelength_bool():
+    """Test parsing regrid_wavelength as boolean."""
+    parsed = parse_parameters({"wavelength": 0.5, "regrid_wavelength": True})
+    assert parsed["regrid_wavelength"] is True
+    assert isinstance(parsed["regrid_wavelength"], bool)
+
+    parsed = parse_parameters({"wavelength": 0.5, "regrid_wavelength": False})
+    assert parsed["regrid_wavelength"] is False
+    assert isinstance(parsed["regrid_wavelength"], bool)
+
+
+def test_parse_parameters_regrid_wavelength_string():
+    """Test parsing regrid_wavelength from string."""
+    # Test true-like strings
+    for true_string in ["true", "True", "TRUE", "1", "yes", "Yes", "YES"]:
+        parsed = parse_parameters({"wavelength": 0.5, "regrid_wavelength": true_string})
+        assert parsed["regrid_wavelength"] is True
+        assert isinstance(parsed["regrid_wavelength"], bool)
+
+    # Test false-like strings
+    for false_string in ["false", "False", "FALSE", "0", "no", "No", "NO"]:
+        parsed = parse_parameters(
+            {"wavelength": 0.5, "regrid_wavelength": false_string}
+        )
+        assert parsed["regrid_wavelength"] is False
+        assert isinstance(parsed["regrid_wavelength"], bool)
+
+
+def test_parse_parameters_regrid_wavelength_int():
+    """Test parsing regrid_wavelength from integer."""
+    parsed = parse_parameters({"wavelength": 0.5, "regrid_wavelength": 1})
+    assert parsed["regrid_wavelength"] is True
+    assert isinstance(parsed["regrid_wavelength"], bool)
+
+    parsed = parse_parameters({"wavelength": 0.5, "regrid_wavelength": 0})
+    assert parsed["regrid_wavelength"] is False
+    assert isinstance(parsed["regrid_wavelength"], bool)
 
 
 # ============================================================================
