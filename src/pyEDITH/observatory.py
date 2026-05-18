@@ -14,49 +14,6 @@ import logging
 logger = logging.getLogger("pyEDITH")
 
 
-# TODO keep until HWOME handshake is established and environment variables still exist
-def build_component_path(component_type: str, path: str) -> str:
-    """
-    Build the full path to a component based on its type.
-
-    This method constructs the absolute path to a component file based on
-    the component type and the provided relative path. It uses environment
-    variables to determine the base directories.
-
-    Parameters
-    ----------
-    component_type : str
-        Type of component ('telescopes', 'detectors', or 'coronagraphs')
-    path : str
-        Relative path to the component file
-
-    Returns
-    -------
-    str
-        Absolute path to the component file
-
-    Raises
-    ------
-    EnvironmentError
-        If the required environment variable is not set
-    ValueError
-        If the component type is unknown
-    """
-
-    if component_type == "telescopes" or component_type == "detectors":
-        base_dir = os.environ.get("SCI_ENG_DIR")
-        if not base_dir:
-            raise EnvironmentError("SCI_ENG_DIR environment variable not set")
-    elif component_type == "coronagraphs":
-        base_dir = os.environ.get("YIP_CORO_DIR")
-        if not base_dir:
-            raise EnvironmentError("YIP_CORO_DIR environment variable not set")
-    else:
-        raise ValueError(f"Unknown component type: {component_type}")
-
-    return os.path.join(base_dir, path)
-
-
 class Observatory(ABC):  # abstract class
     """
     Abstract base class for various astronomical observatories.
