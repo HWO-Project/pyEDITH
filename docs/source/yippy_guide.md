@@ -25,10 +25,12 @@ quantities below and exposes them in the form pyEDITH's noise budget expects.
 
 ## Finding a YIP
 
-We currently recommend that people download from the catalog of YIPs hosted on Zenodo while a long
-term hosting solution is determined. These can be downloaded with a single call. Browse
-the catalog with `yippy.list_yips()`, or view the rendered table on the
-[yippy datasets page](https://yippy.readthedocs.io/en/latest/datasets.html).
+yippy currently ships a minimal two-entry catalog of YIPs hosted as
+assets on a tagged GitHub release of the yippy repo. Long-term YIP
+hosting will be provided by ExEP, and once that catalog comes online
+the discovery API will route through it. For now, browse the
+local catalog with `yippy.list_yips()`, or view the rendered table on
+the [yippy datasets page](https://yippy.readthedocs.io/en/latest/datasets.html).
 To pull a specific YIP, pass its catalog name to `fetch_yip`, which
 downloads the archive on first call and serves it from a local cache on
 subsequent calls.
@@ -36,15 +38,15 @@ subsequent calls.
 ```python
 from yippy import list_yips, fetch_yip
 
-list_yips()                  # all available names
+list_yips()                  # all available names (currently two)
 list_yips(telescope="eac1")  # narrow by telescope, coronagraph, or sampling
 yip_path = fetch_yip("eac1_aavc_2d")
 ```
 
-For in-development YIPs that are not yet on Zenodo, drop the YIP folder
-somewhere on disk and point the `YIP_CORO_DIR` environment variable at
-it. pyEDITH will pick it up when a registry entry refers to a folder
-name instead of a catalog name (see [Where the YIP comes
+For in-development YIPs that are not in the catalog, drop the YIP
+folder somewhere on disk and point the `YIP_CORO_DIR` environment
+variable at it. pyEDITH will pick it up when a `coronagraph_type` value
+matches the folder name (see [Where the YIP comes
 from](#where-the-yip-comes-from) below).
 
 ## Coronagraph quantities in the ETC
@@ -96,7 +98,8 @@ and the exposure time is identical.
 from yippy import Coronagraph, fetch_yip
 from pyEDITH.components.coronagraphs import CoronagraphYIP
 
-# Fetch the YIP (downloaded from Zenodo on first call, cached after).
+# Fetch the YIP (downloaded from the yippy GitHub release on first
+# call, cached after).
 # See https://yippy.readthedocs.io/en/latest/datasets.html for catalog.
 yip_path = fetch_yip("eac1_aavc_2d")
 
@@ -130,7 +133,7 @@ from FITS each time.
 # Catalog name -- yippy downloads + caches the YIP for you.
 coronagraph = CoronagraphYIP(path=fetch_yip("eac1_aavc_2d"))
 
-# A folder on disk (e.g. an in-development YIP not yet on Zenodo).
+# A folder on disk (e.g. an in-development YIP not in the catalog).
 coronagraph = CoronagraphYIP(path="/path/to/yip")
 ```
 
@@ -139,17 +142,22 @@ above.
 
 ## Where the YIP comes from
 
-When pyEDITH is told to use a registry entry (for example via
-`observatory_preset="EAC1"`), the loader looks at the entry's fields
-to decide how to resolve the YIP:
+When you build an Observatory with `create_observatory`, the
+`coronagraph_type` field controls how the YIP is loaded. pyEDITH
+resolves it in this priority order:
 
-1. **`yippy_name`** (preferred). The YIP is fetched from Zenodo via
-   `yippy.fetch_yip` and cached locally. No environment variables
-   required. Browse names with `yippy.list_yips()` or see the
+1. **Pre-constructed `yippy.Coronagraph` object.** If you have already
+   built a `Coronagraph` and want to reuse it across many targets, pass
+   the object directly. See
+   [Recommended pattern](#recommended-pattern-load-once-pass-everywhere)
+   above for why this is preferred.
+2. **Direct path on disk.** A `coronagraph_type` value that resolves
+   to an existing directory is loaded as a YIP.
+3. **`YIP_CORO_DIR` lookup.** A bare name is joined with the
+   `YIP_CORO_DIR` environment variable and checked next. Use this for
+   in-development YIPs that are not in the yippy catalog.
+4. **Remote fetch via yippy.** As a last resort, the name is passed to
+   `yippy.fetch_yip`, which downloads the YIP from the yippy repo's
+   GitHub release assets and caches it locally. Browse names with
+   `yippy.list_yips()` or the
    [yippy datasets page](https://yippy.readthedocs.io/en/latest/datasets.html).
-2. **`path`** (legacy). The folder name is joined with the
-   `YIP_CORO_DIR` environment variable. Use this for in-development
-   YIPs that have not yet been published to Zenodo.
-
-See [Advanced Options](advanced.md#add-your-own-yip-coronagraph) for
-the registry schema.
