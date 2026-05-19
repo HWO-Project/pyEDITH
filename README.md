@@ -12,7 +12,7 @@
   <a href="https://github.com/HWO-Project/pyEDITH/actions/workflows/run_and_test.yml/">
     <img src="https://img.shields.io/github/actions/workflow/status/HWO-Project/pyEDITH/run_and_test.yml?branch=main&logo=github&style=for-the-badge" alt="CI">
   </a>
-<a href="https://zenodo.org/records/19582742"><img src="https://img.shields.io/badge/DOI-doi.org%2Fzenodo.17917472-blue?style=for-the-badge" alt="DOI"></a>
+<a href="https://zenodo.org/records/17917471"><img src="https://img.shields.io/badge/DOI-doi.org%2Fzenodo.17917471-blue?style=for-the-badge" alt="DOI"></a>
 </p>
 
 
