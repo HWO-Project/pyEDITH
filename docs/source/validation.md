@@ -13,7 +13,7 @@ Since `pyEDITH` stems from AYO, we expect to find the smallest differences betwe
 We also notice some differences in the calculation of some coronagraph-related variables ({math}`I\_star`, {math}`omega\_core`): `pyEDITH` relies on the Python-based external package [yippy](https://yippy.readthedocs.io/en/latest/) for the calculation of these variables, which is marginally different from the original AYO calculation.
 
 
-In the figures below, we show the results for the three earlier ETCs (AYO in blue, EBS in green, EXOSIMS in red) compared to pyEDITH (in purple), for all the cases explored in [Stark et al. 2025](https://ui.adsabs.harvard.edu/abs/2025arXiv250218556S/abstract).
+In the figures below, we show the results for the three earlier ETCs compared to pyEDITH, for all the cases explored in [Stark et al. 2025](https://ui.adsabs.harvard.edu/abs/2025arXiv250218556S/abstract).  Markers show: results from \texttt{pyEDITH} (green stars); AYO (yellow circles); EBS (red circles); EXOSIMS (cyan circles). As a dashed black line, the mean value $\mu$ of the estimates obtained by AYO, EBS, and pyEDITH; as a shaded gray area, the 1-{math}`\sigma` envelope of these estimates.
 
 
 **HIP 26779 at 500 nm**

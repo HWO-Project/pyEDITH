@@ -13,6 +13,7 @@ src/pyEDITH/components/__pycache__/detectors.cpython-312.pyc
 tests/__pycache__/
 tests/validation_tests_battery/*.png
 AncillaryMaterial/
+RASTI_material/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -143,6 +144,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+pyedith-dist-env/
 
 # Spyder project settings
 .spyderproject

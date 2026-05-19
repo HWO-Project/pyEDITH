@@ -12,9 +12,9 @@ source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
 ```
 git clone https://github.com/HWO-GOMAP-Working-Groups/Sci-Eng-Interface/tree/main
 ```
-.. danger:: 
-This will be deprecated in v.2.0.
 
+```{warning} This will be deprecated in v.2.0.
+```
 
 2. (Optional) Create a folder containing the "Yield Input Packages". More information on the [Coronagraph (YIP) Guide](yippy_guide.md).
 

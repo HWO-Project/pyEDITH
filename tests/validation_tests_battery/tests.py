@@ -2,10 +2,12 @@ import os
 import pandas as pd
 import numpy as np
 from astropy import units as u
-from pyEDITH import calculate_texp, lambda_d_to_arcsec
+from pyEDITH import calculate_texp, lambda_d_to_arcsec, set_verbosity
 from pyEDITH.units import *
 import matplotlib.pyplot as plt
 import hwostyle
+
+set_verbosity(level="warning")
 
 hwostyle.use("light")
 
@@ -113,7 +115,9 @@ def prepare_input_params(df, hpic, hip_name, code):
         "CRb_multiplier": 2.0,
         "Fstar": np.array([df.loc[df["parameter"] == "F_star", code].iloc[0]]),
         "Fp": np.array([df.loc[df["parameter"] == "F_p", code].iloc[0]]),
-        "observatory_preset": "EAC1",
+        "telescope_type": "EAC1",
+        "detector_type": "EAC1",
+        "coronagraph_type": "usort_offaxis_ovc",
         "observing_mode": "IMAGER",
         "delta_mag_min": 25,
         "nchannels": 1,
