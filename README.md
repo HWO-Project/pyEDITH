@@ -3,14 +3,14 @@
 </p>
 
 <p align="center">
-  <a href="https://app.codecov.io/gh/eleonoraalei/pyEDITH">
-    <img src="https://img.shields.io/codecov/c/github/eleonoraalei/pyEDITH?style=for-the-badge&logo=codecov" alt="Codecov">
+  <a href="https://app.codecov.io/gh/HWO-Project/pyEDITH">
+    <img src="https://img.shields.io/codecov/c/github/HWO-Project/pyEDITH?style=for-the-badge&logo=codecov" alt="Codecov">
   </a>
   <a href="https://pyedith.readthedocs.io/en/latest/">
     <img src="https://readthedocs.org/projects/pyedith/badge/?version=latest&style=for-the-badge" alt="Documentation Status">
   </a>
-  <a href="https://github.com/eleonoraalei/pyEDITH/actions/workflows/run_and_test.yml/">
-    <img src="https://img.shields.io/github/actions/workflow/status/eleonoraalei/pyEDITH/run_and_test.yml?branch=main&logo=github&style=for-the-badge" alt="CI">
+  <a href="https://github.com/HWO-Project/pyEDITH/actions/workflows/run_and_test.yml/">
+    <img src="https://img.shields.io/github/actions/workflow/status/HWO-Project/pyEDITH/run_and_test.yml?branch=main&logo=github&style=for-the-badge" alt="CI">
   </a>
 <a href="https://zenodo.org/records/19582742"><img src="https://img.shields.io/badge/DOI-doi.org%2Fzenodo.17917472-blue?style=for-the-badge" alt="DOI"></a>
 </p>
@@ -21,12 +21,6 @@ Exposure Direct Imaging Timer for HWO (Python Version)
 
 
 ## Installation
-Clone the pyEDITH repository:
-
-```
-git clone https://github.com/eleonoraalei/pyEDITH.git
-cd pyEDITH
-```
 
 Create a virtual environment (optional but recommended):
 
@@ -35,10 +29,20 @@ python -m venv venv
 source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
 ```
 
-Install the package:
+Install from pyPI:
+
 ```
+pip install pyEDITH
+``
+
+Or, if preferred, clone the pyEDITH repository and install locally:
+
+```
+git clone https://github.com/HWO-Project/pyEDITH.git
+cd pyEDITH
 pip install -e .
 ```
+
 Set up environment variables: Add the following lines to your `.bashrc` or `.zshrc` file:
 
 ```
