@@ -33,7 +33,7 @@ Install from pyPI:
 
 ```
 pip install pyEDITH
-``
+```
 
 Or, if preferred, clone the pyEDITH repository and install locally:
 
