@@ -18,7 +18,7 @@ class ColorCodes:
 class ColoredFormatter(logging.Formatter):
     """Custom formatter that colors entire log line except message for WARNING and ERROR levels."""
 
-    def format(self, record):  # pragma: no cover
+    def format(self, record):
         # Format the record first
         formatted = super().format(record)
 
@@ -143,6 +143,13 @@ __all__ = [
     "validate_attributes",
 ]
 
-__version__ = "1.5.1"
-
 set_verbosity(level="warning")
+
+# __init__.py
+# Read version from pyproject.toml dynamically
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    __version__ = version("pyEDITH")
+except PackageNotFoundError:
+    __version__ = "unknown"
