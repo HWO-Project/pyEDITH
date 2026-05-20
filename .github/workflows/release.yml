@@ -1,0 +1,115 @@
+name: Publish to PyPI (Production)
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  validate-and-publish:
+    runs-on: ubuntu-latest
+    environment: pypi  
+    permissions:
+      contents: read
+      id-token: write  
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      # STEP 1: VALIDATE VERSION MATCHES TAG
+      - name: Validate version matches tag
+        run: |
+          import tomllib
+          import sys
+          
+          tag = "${{ github.event.release.tag_name }}"
+          tag_version = tag.lstrip('v')
+          
+          with open("pyproject.toml", "rb") as f:
+              pyproject = tomllib.load(f)
+          
+          pyproject_version = pyproject["project"]["version"]
+          
+          print(f"\n{'='*60}")
+          print(f"VERSION VALIDATION")
+          print(f"{'='*60}")
+          print(f"Git Tag:              {tag}")
+          print(f"Tag Version (clean):  {tag_version}")
+          print(f"pyproject.toml:       {pyproject_version}")
+          print(f"{'='*60}\n")
+          
+          if tag_version != pyproject_version:
+              print(f"❌ VERSION MISMATCH - ABORTING PUBLISH")
+              print(f"\n   Tag '{tag}' does not match pyproject.toml version '{pyproject_version}'")
+              print(f"   Please fix the version and create a matching tag.\n")
+              sys.exit(1)
+          else:
+              print(f"✅ Versions match! Safe to proceed.\n")
+        shell: python
+
+      # STEP 2: INSTALL DEPENDENCIES
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+
+      # STEP 3: BUILD DISTRIBUTION
+      - name: Build distribution
+        run: |
+          echo "Building package..."
+          python -m build
+          echo "Build complete. Contents:"
+          ls -lah dist/
+
+      # STEP 4: CHECK BUILD INTEGRITY
+      - name: Verify build artifacts
+        run: |
+          import os
+          import sys
+          
+          dist_dir = "dist"
+          files = os.listdir(dist_dir)
+          
+          print(f"\nBuild artifacts:")
+          for f in files:
+              size = os.path.getsize(os.path.join(dist_dir, f))
+              print(f"  {f} ({size} bytes)")
+          
+          has_wheel = any(f.endswith('.whl') for f in files)
+          has_sdist = any(f.endswith('.tar.gz') for f in files)
+          
+          if not has_wheel or not has_sdist:
+              print(f"\n❌ ERROR: Missing build artifacts!")
+              if not has_wheel:
+                  print(f"   Missing: .whl file")
+              if not has_sdist:
+                  print(f"   Missing: .tar.gz file")
+              sys.exit(1)
+          
+          print(f"\n✅ All expected artifacts present\n")
+        shell: python
+
+      # STEP 5: PUBLISH TO PyPI (using Trusted Publisher)
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+      # STEP 6: SUMMARY
+      - name: Publication Summary
+        run: |
+          echo "✅ Successfully published to PyPI"
+          echo ""
+          echo "Release details:"
+          echo "  Tag: ${{ github.event.release.tag_name }}"
+          echo "  Repository: ${{ github.repository }}"
+          echo "  Commit: ${{ github.sha }}"
+          echo ""
+          echo "Next steps:"
+          echo "  1. Visit https://pypi.org/project/pyEDITH/"
+          echo "  2. Verify the new version is visible"
+          echo "  3. Test installation: pip install --upgrade pyEDITH"
